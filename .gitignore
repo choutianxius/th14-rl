@@ -5,6 +5,9 @@ game.zip
 # experimental memory reader
 memory-reader/
 
+# experimental pid getter
+pid-getter/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
