@@ -8,6 +8,7 @@ import time
 import os
 import pygetwindow as gw
 import keyboard
+import pyautogui
 
 
 logging.basicConfig(
@@ -163,18 +164,31 @@ def read_game_status_int(key: str):
     return _read_game_memory(offset, 4)
 
 
+def capture_frame():
+    """
+    Capture and return the current game scene as a Pillow image.
+    """
+    return pyautogui.screenshot(
+        region=(
+            _game_window.left + 35,
+            _game_window.top + 42,
+            _game_window.width - 261,
+            _game_window.height - 60,
+        )
+    )
+
+
 if __name__ == "__main__":
     try:
         _init()
+        _resume_game_process()
         while True:
-            status = {}
-            for v in _OFFSETS:
-                v_offset = _OFFSETS[v]
-                data = _read_game_memory(v_offset, 4)
-                if data is not None:
-                    status[v] = int.from_bytes(data, byteorder="little")
-            logger.info(status)
-            time.sleep(1)
+            keyboard.wait("p")
+            _suspend_game_process()
+            frame = capture_frame()
+            frame.show()
+            keyboard.wait("esc")
+            _resume_game_process()
     except KeyboardInterrupt:
         logger.info("Quitting...")
     finally:
