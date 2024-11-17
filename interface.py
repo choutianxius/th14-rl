@@ -126,8 +126,12 @@ def _get_focus():
 
 
 def _resume_shooting():
+    t0 = time.time()
+    _resume_game_process()
     keyboard.release("z")
     keyboard.press("z")
+    time.sleep(max(0, 1 / _FRAME_RATE - time.time() + t0))
+    _suspend_game_process()
 
 
 def init():
@@ -206,15 +210,22 @@ def skip_dialog():
     def dialog_end():
         return len(q) == 3 and sum([int(x != -1) for x in q]) == 3
 
-    while (not dialog_end()) and tries < max_retry:
-        tries += 1
+    keyboard.press("ctrl")
+    _resume_game_process()
+    while tries < max_retry:
         t0 = time.time()
+
+        if dialog_end():
+            break
+        tries += 1
         q.append(read_game_status_int("in_dialog"))
-        _resume_game_process()
-        _press_and_release("z")
+
         time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
-        _suspend_game_process()
+    else:
+        raise Exception("Failed to skip dialog!")
+    keyboard.release("ctrl")
     _resume_shooting()
+    _suspend_game_process
 
 
 def clean_up():
@@ -233,7 +244,6 @@ if __name__ == "__main__":
             game_state = read_game_status_int("game_state")
             logger.info({"in_dialog": in_dialog, "game_state": game_state})
             if in_dialog == -1:
-                _suspend_game_process()
                 skip_dialog()
                 _resume_game_process()
             if game_state == 1:
@@ -242,5 +252,8 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         logger.info("Quitting...")
+    except Exception as e:
+        logger.error("Unexpected exception happened:")
+        logger.errr(e)
     finally:
         clean_up()
