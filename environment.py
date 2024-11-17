@@ -12,14 +12,18 @@ class Touhou14Env(gym.Env):
     with FrameStack again.
     """
 
-    def __init__(self, n_frame_stack: int = 4) -> None:
+    def __init__(self) -> None:
         self.observation_space = gym.spaces.Box(0, 255, (I.FRAME_HEIGHT, I.FRAME_WIDTH))
         self.action_space = gym.spaces.MultiDiscrete([2, 5])
         I.init()
         I.suspend_game_process()
         self.info = self._get_info()
-        self.n_frame_stack = n_frame_stack
+        self.n_frame_stack = 4
         self.frame_buffer = deque(maxlen=self.n_frame_stack)
+
+        # used to truncate episode when losing too many lives
+        self.initial_lives = self.info["lives"]
+        self.max_lost_lives = 2
 
     def step(self, action: np.ndarray):
         move, slow = int(action[0]), int(action[1])
@@ -32,7 +36,7 @@ class Touhou14Env(gym.Env):
             if I.read_game_status_int("game_state") != 2:  # end of run
                 break
 
-            if I.read_game_status_int("in_dialog") != -1:  # in dialog
+            if I.read_game_status_int("in_dialog") == -1:  # in dialog
                 I.resume_game_process()
                 I.skip_dialog()
                 I.suspend_game_process()
@@ -42,10 +46,9 @@ class Touhou14Env(gym.Env):
 
         next_state = np.stack(self.frame_buffer, axis=0)
         curr_info = self._get_info()
-        reward = self._calc_return(curr_info) - self._calc_return(self.info)
+        reward = self._calc_return(**curr_info) - self._calc_return(**self.info)
         terminated = curr_info["game_state"] != 2
-        # might introduce custom logic here, e.g., truncate when losing lives
-        truncated = False
+        truncated = curr_info["lives"] < self.initial_lives - self.max_lost_lives
         self.info = curr_info
         return next_state, reward, terminated, truncated, curr_info
 
@@ -65,7 +68,11 @@ class Touhou14Env(gym.Env):
         state = np.stack(self.frame_buffer, axis=0)
         info = self._get_info()
         self.info = info
+        self.initial_lives = info["lives"]
         return state, info
+
+    def close(self):
+        I.clean_up()
 
     def _get_info(self) -> dict[str, int]:
         info = {}
@@ -90,6 +97,7 @@ class Touhou14Env(gym.Env):
         bombs: int,
         bomb_fragments: int,
         power: int,
+        **kwargs: dict[str, int],
     ):
         """
         Calculate the return from game states.

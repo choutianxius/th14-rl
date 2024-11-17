@@ -152,6 +152,7 @@ def init():
     Enter the "practice start" phase from the title screen
     """
     _get_focus()
+    release_all_keys()
 
     # after some time of inactivity, the game will enter a demo play phase
     # and we quit from that
@@ -213,7 +214,7 @@ def skip_dialog():
     Skip the dialog phases
     """
     # a rough estimate of the duration of the dialog to prevent infinite loop
-    max_retry = (3 * _FRAME_RATE) // 5
+    max_retry = 3 * _FRAME_RATE
     tries = 0
     q = deque(maxlen=3)
 
@@ -221,6 +222,7 @@ def skip_dialog():
         return len(q) == 3 and sum([int(x != -1) for x in q]) == 3
 
     release_all_keys()
+    time.sleep(5 / _FRAME_RATE)
     keyboard.press("ctrl")
     while tries < max_retry:
         t0 = time.time()
@@ -229,7 +231,6 @@ def skip_dialog():
             break
         tries += 1
         q.append(read_game_status_int("in_dialog"))
-
         time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
     else:
         raise Exception("Failed to skip dialog!")
@@ -310,6 +311,10 @@ def release_all_keys() -> None:
         if _pressed_keys[k]:
             keyboard.release(k)
             _pressed_keys[k] = False
+    keyboard.release("z")
+    keyboard.release("r")
+    keyboard.release("esc")
+    keyboard.release("ctrl")
 
 
 def reset_from_end_of_run() -> None:
@@ -317,8 +322,17 @@ def reset_from_end_of_run() -> None:
     Reset when the game is cleared or all lives are lost.
     """
     _press_and_release("up")
+    time.sleep(30 / _FRAME_RATE)
     _press_and_release("z")
-    time.sleep(5 / _FRAME_RATE)
+    time.sleep(30 / _FRAME_RATE)
+    count = 0
+    max_retry = (3 * _FRAME_RATE) // 5
+    while count < max_retry:
+        t0 = time.time()
+        if read_game_status_int("game_state") == 2:
+            break
+        count += 1
+        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
     _resume_shooting()
 
 
@@ -328,13 +342,24 @@ def force_reset() -> None:
     """
     release_all_keys()
     _press_and_release("esc")
+    time.sleep(30 / _FRAME_RATE)
     _press_and_release("r")
-    time.sleep(5 / _FRAME_RATE)
+    time.sleep(30 / _FRAME_RATE)
+    count = 0
+    max_retry = (3 * _FRAME_RATE) // 5
+    while count < max_retry:
+        t0 = time.time()
+        if read_game_status_int("game_state") == 2:
+            break
+        count += 1
+        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
+
     _resume_shooting()
 
 
 def clean_up():
     resume_game_process()
+    release_all_keys()
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 
