@@ -9,6 +9,7 @@ import os
 import pygetwindow as gw
 import keyboard
 import pyautogui
+from collections import deque
 
 
 logging.basicConfig(
@@ -32,6 +33,8 @@ _OFFSETS = dict(
     power=0xF5858,
     piv=0xF584C,
     graze=0xF5840,
+    game_state=0xF7AC8,  # 0 = pausing, 1 = end of run, 2 = playing
+    in_dialog=0xF7BA8,  # -1 = in dialog, otherwise = not
 )
 
 
@@ -122,7 +125,12 @@ def _get_focus():
     time.sleep(0.2)
 
 
-def _init():
+def _resume_shooting():
+    keyboard.release("z")
+    keyboard.press("z")
+
+
+def init():
     """
     Enter the "practice start" phase from the title screen
     """
@@ -151,17 +159,23 @@ def _init():
     time.sleep(1)
     _press_and_release("z")
     time.sleep(1)
+    _press_and_release("right")
+    time.sleep(1)
     _press_and_release("z")
     time.sleep(1)
     _press_and_release("z")
     time.sleep(2.5)
 
+    # always fire
+    _resume_shooting()
     _suspend_game_process()
 
 
 def read_game_status_int(key: str):
+    if key not in _OFFSETS:
+        raise ValueError(f"Invalid offset key: {key}")
     offset = _OFFSETS[key]
-    return _read_game_memory(offset, 4)
+    return int.from_bytes(_read_game_memory(offset, 4), byteorder="little", signed=True)
 
 
 def capture_frame():
@@ -178,19 +192,55 @@ def capture_frame():
     )
 
 
+def skip_dialog():
+    """
+    Skip the dialog phases
+    """
+    _suspend_game_process()
+
+    # a rough estimate of the duration of the dialog to prevent infinite loop
+    max_retry = (3 * _FRAME_RATE) // 5
+    tries = 0
+    q = deque(maxlen=3)
+
+    def dialog_end():
+        return len(q) == 3 and sum([int(x != -1) for x in q]) == 3
+
+    while (not dialog_end()) and tries < max_retry:
+        tries += 1
+        t0 = time.time()
+        q.append(read_game_status_int("in_dialog"))
+        _resume_game_process()
+        _press_and_release("z")
+        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
+        _suspend_game_process()
+    _resume_shooting()
+
+
+def clean_up():
+    _resume_game_process()
+    win32api.CloseHandle(_process_handle)
+    logger.info("Interface successfully exited")
+
+
 if __name__ == "__main__":
     try:
-        _init()
+        init()
         _resume_game_process()
         while True:
-            keyboard.wait("p")
-            _suspend_game_process()
-            frame = capture_frame()
-            frame.show()
-            keyboard.wait("esc")
-            _resume_game_process()
+            t0 = time.time()
+            in_dialog = read_game_status_int("in_dialog")
+            game_state = read_game_status_int("game_state")
+            logger.info({"in_dialog": in_dialog, "game_state": game_state})
+            if in_dialog == -1:
+                _suspend_game_process()
+                skip_dialog()
+                _resume_game_process()
+            if game_state == 1:
+                break
+            time.sleep(max(0, 10 / _FRAME_RATE - time.time() + t0))
+
     except KeyboardInterrupt:
         logger.info("Quitting...")
     finally:
-        _resume_game_process()
-        win32api.CloseHandle(_process_handle)
+        clean_up()
