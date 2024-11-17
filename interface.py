@@ -26,9 +26,9 @@ _FRAME_RATE = 60
 _OFFSETS = dict(
     score=0xF5830,
     lives=0xF5864,
-    life_pieces=0xF5868,
+    life_fragments=0xF5868,  # 3 life fragments = 1 life
     bombs=0xF5870,
-    bomb_pieces=0xF5874,
+    bomb_fragments=0xF5874,  # 8 bomb fragments = 1 bomb
     bonus_count=0xF5894,
     power=0xF5858,
     piv=0xF584C,
@@ -36,6 +36,16 @@ _OFFSETS = dict(
     game_state=0xF7AC8,  # 0 = pausing, 1 = end of run, 2 = playing
     in_dialog=0xF7BA8,  # -1 = in dialog, otherwise = not
 )
+
+# the Windows borders are included in _WINDOW_WIDTH and _WINDOW_HEIGHT
+# tested on Win11 with 2560x1440 screen with 100% scale
+# TODO: programmatically get the "inner" window dimensions
+_WINDOW_WIDTH = 646
+_WINDOW_HEIGHT = 509
+FRAME_WIDTH = _WINDOW_WIDTH - 261
+FRAME_HEIGHT = _WINDOW_HEIGHT - 60
+_FRAME_LEFT = 35
+_FRAME_TOP = 42
 
 
 # get a handle to the game window
@@ -48,6 +58,12 @@ else:
     exit(1)
 
 _game_window = _game_windows[0]
+if _game_window.width != _WINDOW_WIDTH or _game_window.height != _WINDOW_HEIGHT:
+    logger.error(
+        f"Invalid window resolution: {_game_window.width}x{_game_window.height}"
+    )
+    logger.info(f"Launch the game with {_WINDOW_WIDTH}x{_WINDOW_HEIGHT} resolution")
+    exit(1)
 
 # get the game pid from the window handle
 _pid = ctypes.c_ulong()
@@ -87,11 +103,11 @@ _process_handle = ctypes.windll.kernel32.OpenProcess(
 )
 
 
-def _suspend_game_process():
+def suspend_game_process():
     ctypes.windll.kernel32.DebugActiveProcess(_game_pid)
 
 
-def _resume_game_process():
+def resume_game_process():
     ctypes.windll.kernel32.DebugActiveProcessStop(_game_pid)
 
 
@@ -126,12 +142,9 @@ def _get_focus():
 
 
 def _resume_shooting():
-    t0 = time.time()
-    _resume_game_process()
     keyboard.release("z")
+    time.sleep(1 / _FRAME_RATE)
     keyboard.press("z")
-    time.sleep(max(0, 1 / _FRAME_RATE - time.time() + t0))
-    _suspend_game_process()
 
 
 def init():
@@ -172,7 +185,6 @@ def init():
 
     # always fire
     _resume_shooting()
-    _suspend_game_process()
 
 
 def read_game_status_int(key: str):
@@ -188,10 +200,10 @@ def capture_frame():
     """
     return pyautogui.screenshot(
         region=(
-            _game_window.left + 35,
-            _game_window.top + 42,
-            _game_window.width - 261,
-            _game_window.height - 60,
+            _game_window.left + _FRAME_LEFT,
+            _game_window.top + _FRAME_TOP,
+            FRAME_WIDTH,
+            FRAME_HEIGHT,
         )
     )
 
@@ -200,8 +212,6 @@ def skip_dialog():
     """
     Skip the dialog phases
     """
-    _suspend_game_process()
-
     # a rough estimate of the duration of the dialog to prevent infinite loop
     max_retry = (3 * _FRAME_RATE) // 5
     tries = 0
@@ -210,8 +220,8 @@ def skip_dialog():
     def dialog_end():
         return len(q) == 3 and sum([int(x != -1) for x in q]) == 3
 
+    release_all_keys()
     keyboard.press("ctrl")
-    _resume_game_process()
     while tries < max_retry:
         t0 = time.time()
 
@@ -225,11 +235,106 @@ def skip_dialog():
         raise Exception("Failed to skip dialog!")
     keyboard.release("ctrl")
     _resume_shooting()
-    _suspend_game_process
+
+
+_pressed_keys = {
+    "left": False,
+    "right": False,
+    "up": False,
+    "down": False,
+    "shift": False,
+}
+
+
+def act(move: int, slow: int, k: int = 1) -> None:
+    """
+    Perform one action and advance k frames.
+
+    Args
+    ----
+    move : int
+        0 - no op;
+        1 - left;
+        2 - right;
+        3 - up;
+        4 - down.
+    slow : int
+        0 - normal speed;
+        1 - slow mode.
+    k : int
+        Number of frames to advance. The provided action is kept for the k frames.
+    """
+    if k < 1:
+        raise ValueError(f"Invalid k {k}, should be positive")
+    t0 = time.time()
+    _maintain_keyboard_move(move)
+    _maintain_keyboard_slow(slow)
+    time.sleep(max(0, k / _FRAME_RATE - time.time() + t0))
+
+
+def _maintain_keyboard_move(move: int):
+    if move == 0:
+        for k in ("left", "right", "up", "down"):
+            if _pressed_keys[k]:
+                keyboard.release(k)
+                _pressed_keys[k] = False
+    elif 1 <= move <= 4:
+        for i, x in enumerate(("left", "right", "up", "down")):
+            if i == move - 1:
+                if not _pressed_keys[x]:
+                    keyboard.press(x)
+                    _pressed_keys[x] = True
+            else:
+                if _pressed_keys[x]:
+                    keyboard.release(x)
+                    _pressed_keys[x] = False
+    else:
+        raise ValueError(f"Invalid move flag {move}, should be 0 - 4")
+
+
+def _maintain_keyboard_slow(slow: int):
+    if slow == 0:
+        if _pressed_keys["shift"]:
+            keyboard.release("shift")
+            _pressed_keys["shift"] = False
+    elif slow == 1:
+        if not _pressed_keys["shift"]:
+            keyboard.press("shift")
+            _pressed_keys["shift"] = True
+    else:
+        raise ValueError(f"Invalid slow flag {slow}, should be 0 or 1")
+
+
+def release_all_keys() -> None:
+    for k in _pressed_keys:
+        if _pressed_keys[k]:
+            keyboard.release(k)
+            _pressed_keys[k] = False
+
+
+def reset_from_end_of_run() -> None:
+    """
+    Reset when the game is cleared or all lives are lost.
+    """
+    _press_and_release("up")
+    _press_and_release("z")
+    time.sleep(5 / _FRAME_RATE)
+    _resume_shooting()
+
+
+def force_reset() -> None:
+    """
+    Reset when the game is still running.
+    """
+    release_all_keys()
+    _press_and_release("esc")
+    _press_and_release("r")
+    time.sleep(5 / _FRAME_RATE)
+    _resume_shooting()
 
 
 def clean_up():
-    _resume_game_process()
+    resume_game_process()
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 
@@ -237,23 +342,17 @@ def clean_up():
 if __name__ == "__main__":
     try:
         init()
-        _resume_game_process()
         while True:
             t0 = time.time()
-            in_dialog = read_game_status_int("in_dialog")
-            game_state = read_game_status_int("game_state")
-            logger.info({"in_dialog": in_dialog, "game_state": game_state})
-            if in_dialog == -1:
-                skip_dialog()
-                _resume_game_process()
-            if game_state == 1:
-                break
-            time.sleep(max(0, 10 / _FRAME_RATE - time.time() + t0))
-
+            info = {}
+            for k in _OFFSETS:
+                info[k] = read_game_status_int(k)
+            logger.info(info)
+            time.sleep(max(0, 30 / _FRAME_RATE - time.time() + t0))
     except KeyboardInterrupt:
         logger.info("Quitting...")
     except Exception as e:
-        logger.error("Unexpected exception happened:")
-        logger.errr(e)
+        logger.error("Unexpected error happened")
+        logger.error(e)
     finally:
         clean_up()
