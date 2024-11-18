@@ -1,4 +1,4 @@
-name: Check formatting with Ruff
+name: Formatting Check
 
 on:
   pull_request:

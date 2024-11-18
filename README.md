@@ -1,5 +1,7 @@
 # Reinforcement Learning Agent for Touhou 14
 
+![Formatting Check](https://github.com/choutianxius/th14-rl/actions/workflows/check-formatting.yaml/badge.svg)
+
 Provides a reinforcement learning environment and agent for [Touhou 14](https://en.touhouwiki.net/wiki/Double_Dealing_Character).
 
 ## Quick Start
