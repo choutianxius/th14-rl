@@ -1,2 +1,8 @@
 pywin32
 pygetwindow
+pyautogui
+keyboard
+
+gymnasium
+numpy
+pillow
