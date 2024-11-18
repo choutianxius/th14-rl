@@ -8,7 +8,7 @@ import time
 import os
 import pygetwindow as gw
 import keyboard
-import pyautogui
+import pyscreeze
 from collections import deque
 
 
@@ -199,7 +199,7 @@ def capture_frame():
     """
     Capture and return the current game scene as a Pillow image.
     """
-    return pyautogui.screenshot(
+    return pyscreeze.screenshot(
         region=(
             _game_window.left + _FRAME_LEFT,
             _game_window.top + _FRAME_TOP,
@@ -268,6 +268,7 @@ def act(move: int, slow: int, k: int = 1) -> None:
     if k < 1:
         raise ValueError(f"Invalid k {k}, should be positive")
     t0 = time.time()
+    keyboard.press("z")
     _maintain_keyboard_move(move)
     _maintain_keyboard_slow(slow)
     time.sleep(max(0, k / _FRAME_RATE - time.time() + t0))
@@ -360,6 +361,7 @@ def force_reset() -> None:
 def clean_up():
     resume_game_process()
     release_all_keys()
+    _press_and_release("esc")
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 

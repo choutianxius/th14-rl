@@ -43,7 +43,7 @@ The [game interface](./interface.py) wraps around the game binary and is respons
 - [x] Capturing game frames for state calculation;
 - [x] Handling setting up and maintaining the game, e.g., entering the selected game stages, resetting to stage beginnings, skipping dialogs, etc.
 
-The interface uses the `pywin32` and `pygetwindow` libraries as well as the built-in `ctypes` library for handling the game process. The `pygetwindow` library is also used for capturing screenshots for the game scene. You should run the game binary (`th14.exe`) in windowed mode with 640x480 resolution before using any utility from the interface.
+The interface uses the `pywin32` and `pygetwindow` libraries as well as the built-in `ctypes` library for handling the game process. The `pyscreeze` library is used for capturing screenshots for the game scene. You should run the game binary (`th14.exe`) in windowed mode with 640x480 resolution before using any utility from the interface.
 
 The RL state is represented as the game scenes. Rewards are calculated from reading variables in the games memory, for example, current score, remaining lives, power level, etc. Memory offsets for most of the variables are taken from Guy-L's work ([Acknowledgement](#acknowledgement)), while some of them are found using CE.
 
