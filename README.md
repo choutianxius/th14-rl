@@ -29,7 +29,7 @@ To activate the virtual environment, run:
 Install the dependencies by:
 
 ```shell
-python install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Interface
