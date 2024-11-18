@@ -118,5 +118,5 @@ class Touhou14Env(gym.Env):
             score
             + (lives + life_fragments / 3) * 200000
             + (bombs + bomb_fragments / 8) * 100000
-            + power * 10000
+            + power * 1000
         )
