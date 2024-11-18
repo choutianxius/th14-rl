@@ -8,6 +8,9 @@ memory-reader/
 # experimental pid getter
 pid-getter/
 
+# save files
+save/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
