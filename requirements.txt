@@ -1,6 +1,6 @@
 pywin32
 pygetwindow
-pyautogui
+pyscreeze
 keyboard
 
 gymnasium
