@@ -16,7 +16,7 @@ try:
         device="cuda",
     )
     # about 10s episodes
-    model.learn(total_timesteps=10000, log_interval=4)
-    model.save("./save/dqn")
+    model.learn(total_timesteps=1000, log_interval=4)
+    model.save("./save/dqn_cuda")
 finally:
     env.close()
