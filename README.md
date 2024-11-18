@@ -34,6 +34,8 @@ Install the dependencies by:
 pip install -r requirements.txt
 ```
 
+Notice that we are using PyTorch v2.5.1 which depends on [CUDA v12.4](https://developer.nvidia.com/cuda-12-4-0-download-archive). You should install the exact CUDA version.
+
 ## Interface
 
 The [game interface](./interface.py) wraps around the game binary and is responsible for:
@@ -72,7 +74,16 @@ We follow the approach used in the DQN work, and use the stacked game frames as 
 
 Please check the [Touhou wiki](https://en.touhouwiki.net/wiki/Double_Dealing_Character/Gameplay) if you are not familiar with the game play.
 
-We use a two-dimensional discrete action space, with the first dimension representing the movement of the character and the second dimension representing whether the character is in "slow" mode:
+We use a discrete action space (`Discrete(10)`), which encodes two discrete dimensions:
+
+- The first dimension represents the movement of the character;
+- The second dimension represents whether the character is in "slow" mode.
+
+Values of the two dimensions are calculated by:
+
+$$ dim1 = action \ \% \ 5$$
+
+$$ dim2 = action \ // \ 5$$
 
 | Value of the First Dimension | Meaning     |
 | ---------------------------- | ----------- |
@@ -93,11 +104,13 @@ The actions are mapped to keyboard press/release status by the interface.
 
 The reward is calculated using a combination of in-game score and some custom logic. It's calculated using the following formula from in-game variables:
 
-$$ reward = score + total \ lives \times 20000 + total \ bombs \times 10000 + power \times 1000 $$
+$$ criterion = score + total \ lives \times 20000 + total \ bombs \times 10000 + power \times 1000 $$
 
-The in-game score is increased by hitting enemies, collecting items, moving close to enemy bullets (so called "graze"s) and clearing stages. Beyond that, we want to specifically encourage the agent to collect items and penalize life losses, so the extra items are added in the formula.
+$$ reward = \Delta \ criterion $$
 
-The weights in the formula are quite arbitrary, and it's possible to experiment with various settings to find optimal ones for training agents.
+The in-game score is increased by hitting enemies, collecting items, moving close to enemy bullets (so called "graze"s) and clearing stages. Beyond that, we want to explicitly encourage the agent to collect items and penalize life losses, so the extra items are added in the formula.
+
+The weights in the formula are to some extent arbitrary, and it's possible to experiment with various settings to find optimal ones for training agents.
 
 ## Acknowledgement
 
