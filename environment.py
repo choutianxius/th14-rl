@@ -36,10 +36,10 @@ class Touhou14Env(gym.Env):
             I.act(move, slow)
             I.suspend_game_process()
 
-            if I.read_game_status_int("game_state") != 2:  # end of run
+            if I.read_game_int("game_state") != 2:  # end of run
                 break
 
-            if I.read_game_status_int("in_dialog") == -1:  # in dialog
+            if I.read_game_int("in_dialog") == -1:  # in dialog
                 I.resume_game_process()
                 I.skip_dialog()
                 I.suspend_game_process()
@@ -60,7 +60,7 @@ class Touhou14Env(gym.Env):
 
         I.resume_game_process()
         I.release_all_keys()
-        if I.read_game_status_int("game_state") == 1:  # end of run
+        if I.read_game_int("game_state") == 1:  # end of run
             I.reset_from_end_of_run()
         else:
             I.force_reset()
@@ -104,7 +104,7 @@ class Touhou14Env(gym.Env):
             "game_state",
             "in_dialog",
         ):
-            info[k] = I.read_game_status_int(k)
+            info[k] = I.read_game_int(k)
         return info
 
     def _calc_return(
