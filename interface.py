@@ -21,7 +21,6 @@ logger = logging.getLogger("interface")
 
 _MODULE_NAME = "th14.exe"
 _GAME_TITLE = "Double Dealing Character. ver 1.00b"
-_FRAME_RATE = 60
 
 _OFFSETS = dict(
     score=0xF5830,
@@ -111,12 +110,12 @@ def resume_game_process():
     ctypes.windll.kernel32.DebugActiveProcessStop(_game_pid)
 
 
-def _read_game_memory(offset, size):
+def _read_game_memory(offset, size, rel=True):
     buffer = ctypes.create_string_buffer(size)
     bytesRead = ctypes.c_int()
     ok = ctypes.windll.kernel32.ReadProcessMemory(
         _process_handle,
-        ctypes.c_uint64(_base_address + offset),
+        ctypes.c_uint64((_base_address + offset) if rel else offset),
         buffer,
         size,
         ctypes.byref(bytesRead),
@@ -129,11 +128,44 @@ def _read_game_memory(offset, size):
     return buffer.raw
 
 
+def read_game_int(key: str):
+    if key not in _OFFSETS:
+        raise ValueError(f"Invalid offset key: {key}")
+    offset = _OFFSETS[key]
+    return int.from_bytes(
+        _read_game_memory(offset, 4, not key.endswith("_abs")),
+        byteorder="little",
+        signed=True,
+    )
+
+
+_OFFSETS["global_timer_abs"] = 0x191E0 + int.from_bytes(
+    _read_game_memory(0xDB520, 4), byteorder="little", signed=False
+)
+
+
+def _time():
+    assert "global_timer_abs" in _OFFSETS
+    return read_game_int("global_timer_abs")
+
+
+def _sleep(k: int = 0):
+    """
+    Wait for k ticks for the in-game timer.
+    """
+    resume_game_process()  # to prevent forever loop
+    if k < 0:
+        raise ValueError("k should be non positive")
+    t0 = _time()
+    while _time() < t0 + k:
+        pass
+
+
 def _press_and_release(key):
     keyboard.press(key)
-    time.sleep(1 / _FRAME_RATE)
+    _sleep(1)
     keyboard.release(key)
-    time.sleep(1 / _FRAME_RATE)
+    _sleep(1)
 
 
 def _get_focus():
@@ -143,7 +175,7 @@ def _get_focus():
 
 def _resume_shooting():
     keyboard.release("z")
-    time.sleep(1 / _FRAME_RATE)
+    _sleep(1)
     keyboard.press("z")
 
 
@@ -158,7 +190,7 @@ def init():
     # and we quit from that
     _press_and_release("down")
     _press_and_release("esc")
-    time.sleep(3)
+    _sleep(180)
 
     # now we are on the title screen
     _press_and_release("down")
@@ -168,31 +200,24 @@ def init():
     _press_and_release("down")
     _press_and_release("down")
     _press_and_release("z")
-    time.sleep(1)
+    _sleep(60)
 
     # now we are on the game difficulty and character selection screen
     # notice that the character and difficulty are memorized by the game
     # and we assume that the proper selections have been made in previous runs
     _press_and_release("z")
-    time.sleep(1)
+    _sleep(60)
     _press_and_release("z")
-    time.sleep(1)
+    _sleep(60)
     _press_and_release("right")
-    time.sleep(1)
+    _sleep(60)
     _press_and_release("z")
-    time.sleep(1)
+    _sleep(60)
     _press_and_release("z")
-    time.sleep(2.5)
+    _sleep(150)
 
     # always fire
     _resume_shooting()
-
-
-def read_game_status_int(key: str):
-    if key not in _OFFSETS:
-        raise ValueError(f"Invalid offset key: {key}")
-    offset = _OFFSETS[key]
-    return int.from_bytes(_read_game_memory(offset, 4), byteorder="little", signed=True)
 
 
 def capture_frame():
@@ -214,7 +239,7 @@ def skip_dialog():
     Skip the dialog phases
     """
     # a rough estimate of the duration of the dialog to prevent infinite loop
-    max_retry = 3 * _FRAME_RATE
+    max_retry = 180
     tries = 0
     q = deque(maxlen=3)
 
@@ -222,16 +247,16 @@ def skip_dialog():
         return len(q) == 3 and sum([int(x != -1) for x in q]) == 3
 
     release_all_keys()
-    time.sleep(5 / _FRAME_RATE)
+    _sleep(5)
     keyboard.press("ctrl")
     while tries < max_retry:
-        t0 = time.time()
+        t0 = _time()
 
         if dialog_end():
             break
         tries += 1
-        q.append(read_game_status_int("in_dialog"))
-        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
+        q.append(read_game_int("in_dialog"))
+        _sleep(max(0, 5 - _time() + t0))
     else:
         raise Exception("Failed to skip dialog!")
     keyboard.release("ctrl")
@@ -267,11 +292,11 @@ def act(move: int, slow: int, k: int = 1) -> None:
     """
     if k < 1:
         raise ValueError(f"Invalid k {k}, should be positive")
-    t0 = time.time()
+    t0 = _time()
     keyboard.press("z")
     _maintain_keyboard_move(move)
     _maintain_keyboard_slow(slow)
-    time.sleep(max(0, k / _FRAME_RATE - time.time() + t0))
+    _sleep(max(0, k - _time() + t0))
 
 
 def _maintain_keyboard_move(move: int):
@@ -323,17 +348,17 @@ def reset_from_end_of_run() -> None:
     Reset when the game is cleared or all lives are lost.
     """
     _press_and_release("up")
-    time.sleep(30 / _FRAME_RATE)
+    _sleep(30)
     _press_and_release("z")
-    time.sleep(30 / _FRAME_RATE)
+    _sleep(30)
     count = 0
-    max_retry = (3 * _FRAME_RATE) // 5
+    max_retry = 60
     while count < max_retry:
-        t0 = time.time()
-        if read_game_status_int("game_state") == 2:
+        t0 = _time()
+        if read_game_int("game_state") == 2:
             break
         count += 1
-        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
+        _sleep(max(0, 5 - _time() + t0))
     _resume_shooting()
 
 
@@ -343,17 +368,17 @@ def force_reset() -> None:
     """
     release_all_keys()
     _press_and_release("esc")
-    time.sleep(30 / _FRAME_RATE)
+    _sleep(30)
     _press_and_release("r")
-    time.sleep(30 / _FRAME_RATE)
+    _sleep(30)
     count = 0
-    max_retry = (3 * _FRAME_RATE) // 5
+    max_retry = 60
     while count < max_retry:
-        t0 = time.time()
-        if read_game_status_int("game_state") == 2:
+        t0 = _time()
+        if read_game_int("game_state") == 2:
             break
         count += 1
-        time.sleep(max(0, 5 / _FRAME_RATE - time.time() + t0))
+        _sleep(max(0, 5 - _time() + t0))
 
     _resume_shooting()
 
@@ -370,12 +395,12 @@ if __name__ == "__main__":
     try:
         init()
         while True:
-            t0 = time.time()
+            t0 = _time()
             info = {}
             for k in _OFFSETS:
-                info[k] = read_game_status_int(k)
+                info[k] = read_game_int(k)
             logger.info(info)
-            time.sleep(max(0, 30 / _FRAME_RATE - time.time() + t0))
+            _sleep(max(0, 30 - _time() + t0))
     except KeyboardInterrupt:
         logger.info("Quitting...")
     except Exception as e:
