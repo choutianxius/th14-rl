@@ -7,5 +7,6 @@ gymnasium
 numpy==1.26.*
 pillow
 torch==2.5.1+cu124
+opencv-python-headless
 
 stable_baselines3[extra]

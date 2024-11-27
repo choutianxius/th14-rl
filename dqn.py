@@ -8,7 +8,7 @@ try:
     check_env(env, True, True)
 
     model = DQN(
-        "CnnPolicy",
+        "MultiInputPolicy",
         env,
         buffer_size=10000,
         target_update_interval=100,
