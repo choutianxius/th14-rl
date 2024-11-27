@@ -62,6 +62,7 @@ class Touhou14Env(gym.Env):
         self.action_space = gym.spaces.Discrete(10)
         self.max_lost_lives = max_lost_lives
 
+        # Initialize the game interface
         I.init()
         I.suspend_game_process()
         self.info = self._get_game_info()
@@ -106,9 +107,54 @@ class Touhou14Env(gym.Env):
             self.logger.debug({"action": action.tolist(), "reward": reward})
         return next_state, reward, terminated, truncated, curr_info
 
+    def _is_inactive(self, action: np.ndarray):
+        """
+        Detect inactivity based on repeated actions or unchanged observations.
+        """
+        # Action repetition tracking
+        if not hasattr(self, "last_action"):
+            self.last_action = action
+            self.repeated_action_count = 0
+
+        # Check for repeated actions
+        if np.allclose(
+            action, self.last_action, atol=0.1
+        ):  # Allow small action variation
+            self.repeated_action_count += 1
+        else:
+            self.repeated_action_count = 0  # Reset repetition counter if actions vary
+
+        self.last_action = action
+
+        # Threshold for inactivity due to repeated actions
+        if self.repeated_action_count > 10:  # Change threshold as needed
+            return True
+
+        # Optional: Add observation-based inactivity (as above)
+        return self._is_inactive_observation()
+
+    def _is_inactive_observation(self):
+        """
+        Detect inactivity based on lack of changes in recent observations.
+        """
+        if len(self.frame_buffer) < self.n_frame_stack:
+            return False  # Not enough frames to compare
+
+        # Compare the most recent frames in the buffer
+        recent_frames = list(self.frame_buffer)
+        frame_differences = [
+            np.sum(np.abs(recent_frames[i] - recent_frames[i + 1]))
+            for i in range(len(recent_frames) - 1)
+        ]
+
+        # If differences are below a small threshold for all comparisons, consider inactive
+        inactivity_threshold = 1e-3  # Adjust as needed
+        return all(diff < inactivity_threshold for diff in frame_differences)
+
     def reset(self, seed: int | None = None):
         super().reset(seed=seed)
 
+        # Reset the game state
         I.resume_game_process()
         I.release_all_keys()
         if I.read_game_val("game_state") == 1:  # end of run
@@ -117,6 +163,7 @@ class Touhou14Env(gym.Env):
             I.force_reset()
         I.suspend_game_process()
 
+        # Initialize the frame buffer
         frame = I.capture_frame()
         self.frame_buffer.clear()
         for _ in range(self.n_frame_stack):
