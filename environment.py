@@ -35,6 +35,8 @@ class Touhou14Env(gym.Env):
             self.logger = logging.getLogger("Touhou14Env")
             self.logger.setLevel(logging.DEBUG)
             self.logger.addHandler(logging.StreamHandler(sys.stdout))
+        else:
+            self.logger = None
         self.n_frame_stack = n_frame_stack
         self.frame_downsize_ratio = frame_downsize_ratio
         self.frame_buffer = deque(maxlen=self.n_frame_stack)
