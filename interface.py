@@ -1,3 +1,9 @@
+"""
+Game interface.
+
+TODO: Rewrite to use factory pattern
+"""
+
 import sys
 import ctypes
 import win32api
@@ -404,7 +410,9 @@ def force_reset() -> None:
 def clean_up():
     resume_game_process()
     release_all_keys()
+    _sleep(5)
     _press_and_release("esc")
+    _sleep(5)
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 
