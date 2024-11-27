@@ -42,7 +42,7 @@ try:
         json.dump(metadata, f)
 
     # setup model
-    logger = configure(save_dir, ["csv"])
+    logger = configure(save_dir, ["csv", "stdout"])
     chkpt_callback = CheckpointCallback(
         save_freq=args.steps // args.n_save_chkpts,
         save_path=save_dir,
