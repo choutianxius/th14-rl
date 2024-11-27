@@ -227,7 +227,13 @@ class Touhou14Env(gym.Env):
         to prevent the agent "lazily" learn a policy to always stay in it.
 
         1 life = 3 life fragments
+
         1 bomb = 8 bomb fragments
+
+        For reference, in-game clear-stage score bonus is 3 million.
+
+        The current setting is quite arbitrary, and we might experiment with
+        multiple settings to find one with high learning speed
         """
         return (
             self.info["score"]
