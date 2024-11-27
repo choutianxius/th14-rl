@@ -51,8 +51,8 @@ _OFFSETS = dict(
 # TODO: programmatically get the "inner" window dimensions
 _WINDOW_WIDTH = 646
 _WINDOW_HEIGHT = 509
-FRAME_WIDTH = _WINDOW_WIDTH - 261
-FRAME_HEIGHT = _WINDOW_HEIGHT - 60
+FRAME_WIDTH = 384
+FRAME_HEIGHT = 448
 _FRAME_LEFT = 35
 _FRAME_TOP = 42
 
@@ -223,15 +223,16 @@ def init():
     # now the cursor is at the last line in the menu
     _press_and_release("down")
     _press_and_release("down")
+    _press_and_release("down")
     _press_and_release("z")
     _sleep(60)
 
-    # now we are on the game difficulty and character selection screen
-    # notice that the character and difficulty are memorized by the game
-    # and we assume that the proper selections have been made in previous runs
+    # stage 1, spell card 3, reimu B
     _press_and_release("z")
     _sleep(60)
-    _press_and_release("z")
+    _press_and_release("down")
+    _sleep(60)
+    _press_and_release("down")
     _sleep(60)
     _press_and_release("right")
     _sleep(60)
@@ -371,8 +372,6 @@ def reset_from_end_of_run() -> None:
     """
     Reset when the game is cleared or all lives are lost.
     """
-    _press_and_release("up")
-    _sleep(30)
     _press_and_release("z")
     _sleep(30)
     count = 0
@@ -411,11 +410,17 @@ def clean_up():
     resume_game_process()
     release_all_keys()
     _sleep(5)
-    _press_and_release("esc")
-    _sleep(60)
-    _press_and_release("q")
+    game_state = read_game_val("game_state")
+    if game_state == 0:  # pausing
+        _press_and_release("q")
+    elif game_state == 1:
+        _press_and_release("z")
+    else:
+        _press_and_release("esc")
+        _sleep(30)
+        _press_and_release("q")
     _sleep(120)
-    for _ in range(4):
+    for _ in range(3):
         _press_and_release("esc")
         _sleep(60)
     win32api.CloseHandle(_process_handle)
