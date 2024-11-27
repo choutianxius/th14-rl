@@ -3,6 +3,10 @@ import numpy as np
 import interface as I
 from collections import deque
 from typing import Any
+import cv2
+import logging
+import sys
+
 
 class Touhou14Env(gym.Env):
     """
@@ -12,44 +16,73 @@ class Touhou14Env(gym.Env):
     with FrameStack again.
     """
 
-    def __init__(self):
-        self.n_frame_stack = 2
+    def __init__(
+        self,
+        n_frame_stack: int = 4,
+        frame_downsize_ratio: float = 1.0,
+        max_lost_lives: int = 0,
+        debug: bool = False,
+    ):
+        if n_frame_stack < 1:
+            raise ValueError("Number of stacked frames should be positive")
+        if frame_downsize_ratio <= 0.0 or frame_downsize_ratio > 1.0:
+            raise ValueError("Invalid frame downsize ratio, should be 0-1")
+        if max_lost_lives < 0:
+            raise ValueError(
+                "Maximum number of lost lives allowed should be non-negative"
+            )
+        if debug:
+            self.logger = logging.getLogger("Touhou14Env")
+            self.logger.setLevel(logging.DEBUG)
+            self.logger.addHandler(logging.StreamHandler(sys.stdout))
+        self.n_frame_stack = n_frame_stack
+        self.frame_downsize_ratio = frame_downsize_ratio
         self.frame_buffer = deque(maxlen=self.n_frame_stack)
-        
-        # Observation space remains unchanged
-        self.observation_space = gym.spaces.Box(
-            0, 255, (I.FRAME_HEIGHT, I.FRAME_WIDTH, self.n_frame_stack), dtype=np.uint8
+        self.observation_space = gym.spaces.Dict(
+            {
+                "frames": gym.spaces.Box(
+                    low=0,
+                    high=255,
+                    shape=(
+                        int(I.FRAME_HEIGHT * self.frame_downsize_ratio),
+                        int(I.FRAME_WIDTH * self.frame_downsize_ratio),
+                        self.n_frame_stack,
+                    ),
+                    dtype=np.uint8,
+                ),
+                "player_position": gym.spaces.Box(
+                    low=np.array((-184.0, 32.0), dtype=np.float32),
+                    high=np.array((184.0, 432.0), dtype=np.float32),
+                    shape=(2,),
+                ),
+            }
         )
-        
-        # Define a continuous action space for DDPG
-        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
-        # Two continuous actions: [-1, 1] for movement, and [-1, 1] for slow mode intensity
-        
-        self.max_lost_lives = 2
+        self.action_space = gym.spaces.Discrete(10)
+        self.max_lost_lives = max_lost_lives
 
         # Initialize the game interface
         I.init()
         I.suspend_game_process()
-        self.info = self._get_info()
-        # Used to truncate episode when losing too many lives
+        self.info = self._get_game_info()
+        # used to truncate episode when losing too many lives
         self.initial_lives = self.info["lives"]
+        # used to penalize staying in the auto-collect zone too long
+        self.in_auto_collect_zone_time = 0
 
-    def step(self, action: np.ndarray):
-        """
-        Step through the environment using continuous actions.
-        """
-        move = int((action[0] + 1) / 2 * 4)  # Map [-1, 1] to [0, 4]
-        slow = 1 if action[1] > 0 else 0
+    def step(self, action: int | np.integer[Any]):
+        prev_return = self._calc_curr_return()
+
+        move, slow = int(action % 5), int(action // 5)
 
         for _ in range(self.n_frame_stack):
             I.resume_game_process()
             I.act(move, slow)
             I.suspend_game_process()
 
-            if I.read_game_status_int("game_state") != 2:  # End of run
+            if I.read_game_val("game_state") != 2:  # end of run
                 break
 
-            if I.read_game_status_int("in_dialog") == -1:  # In dialog
+            if I.read_game_val("in_dialog") == -1:  # in dialog
                 I.resume_game_process()
                 I.skip_dialog()
                 I.suspend_game_process()
@@ -57,19 +90,19 @@ class Touhou14Env(gym.Env):
             frame = I.capture_frame()
             self.frame_buffer.append(np.array(frame))
 
-        next_state = self._get_stacked_frames()
-        curr_info = self._get_info()
-
-        # Calculate reward
-        reward = self._calc_return(**curr_info) - self._calc_return(**self.info)
-
-        # Penalize inactivity based on observation changes, action repetition, or position
-        if self._is_inactive(action) or self._is_inactive_position(curr_info):
-            reward -= 5  # Apply inactivity penalty
+        next_state = self._get_state()
+        curr_info = self._get_game_info()
 
         terminated = curr_info["game_state"] != 2
         truncated = curr_info["lives"] < self.initial_lives - self.max_lost_lives
+        if next_state["player_position"][1] <= 100.0:
+            self.in_auto_collect_zone_time += 1
+        else:
+            self.in_auto_collect_zone_time = 0
         self.info = curr_info
+        reward = self._calc_curr_return() - prev_return
+        if self.logger:
+            self.logger.debug({"action": action.tolist(), "reward": reward})
         return next_state, reward, terminated, truncated, curr_info
 
     def _is_inactive(self, action: np.ndarray):
@@ -82,7 +115,9 @@ class Touhou14Env(gym.Env):
             self.repeated_action_count = 0
 
         # Check for repeated actions
-        if np.allclose(action, self.last_action, atol=0.1):  # Allow small action variation
+        if np.allclose(
+            action, self.last_action, atol=0.1
+        ):  # Allow small action variation
             self.repeated_action_count += 1
         else:
             self.repeated_action_count = 0  # Reset repetition counter if actions vary
@@ -95,7 +130,7 @@ class Touhou14Env(gym.Env):
 
         # Optional: Add observation-based inactivity (as above)
         return self._is_inactive_observation()
-    
+
     def _is_inactive_observation(self):
         """
         Detect inactivity based on lack of changes in recent observations.
@@ -106,13 +141,13 @@ class Touhou14Env(gym.Env):
         # Compare the most recent frames in the buffer
         recent_frames = list(self.frame_buffer)
         frame_differences = [
-            np.sum(np.abs(recent_frames[i] - recent_frames[i + 1])) for i in range(len(recent_frames) - 1)
+            np.sum(np.abs(recent_frames[i] - recent_frames[i + 1]))
+            for i in range(len(recent_frames) - 1)
         ]
 
         # If differences are below a small threshold for all comparisons, consider inactive
         inactivity_threshold = 1e-3  # Adjust as needed
         return all(diff < inactivity_threshold for diff in frame_differences)
-
 
     def reset(self, seed: int | None = None):
         super().reset(seed=seed)
@@ -120,7 +155,7 @@ class Touhou14Env(gym.Env):
         # Reset the game state
         I.resume_game_process()
         I.release_all_keys()
-        if I.read_game_status_int("game_state") == 1:  # End of run
+        if I.read_game_val("game_state") == 1:  # end of run
             I.reset_from_end_of_run()
         else:
             I.force_reset()
@@ -131,20 +166,18 @@ class Touhou14Env(gym.Env):
         self.frame_buffer.clear()
         for _ in range(self.n_frame_stack):
             self.frame_buffer.append(np.array(frame))
-        state = self._get_stacked_frames()
-        info = self._get_info()
+        state = self._get_state()
+        info = self._get_game_info()
         self.info = info
         self.initial_lives = info["lives"]
+        self.in_auto_collect_zone_time = 0
         return state, info
 
     def close(self):
         I.clean_up()
 
-    def _get_stacked_frames(self) -> np.ndarray:
-        """
-        Grayscale the frames and stack them on the last axis.
-        """
-        return np.clip(
+    def _get_state(self) -> dict:
+        frames_gray_stacked = np.clip(
             np.stack(
                 np.dot(np.stack(self.frame_buffer, axis=0), [0.2989, 0.5870, 0.1140]),
                 axis=-1,
@@ -152,8 +185,23 @@ class Touhou14Env(gym.Env):
             0,
             255,
         ).astype(np.uint8)
+        # note the new size param passed to cv2 is (width, hight)
+        resized_frames = cv2.resize(
+            frames_gray_stacked,
+            (
+                int(I.FRAME_WIDTH * self.frame_downsize_ratio),
+                int(I.FRAME_HEIGHT * self.frame_downsize_ratio),
+            ),
+            interpolation=cv2.INTER_AREA,
+        )
+        pos_x = I.read_game_val("f_player_pos_x")
+        pos_y = I.read_game_val("f_player_pos_y")
+        return {
+            "frames": resized_frames,
+            "player_position": np.array((pos_x, pos_y), dtype=np.float32),
+        }
 
-    def _get_info(self) -> dict[str, int]:
+    def _get_game_info(self) -> dict[str, int]:
         info = {}
         for k in (
             "score",
@@ -165,31 +213,26 @@ class Touhou14Env(gym.Env):
             "game_state",
             "in_dialog",
         ):
-            info[k] = I.read_game_status_int(k)
+            info[k] = I.read_game_val(k)
         return info
 
-    def _calc_return(
-        self,
-        score: int,
-        lives: int,
-        life_fragments: int,
-        bombs: int,
-        bomb_fragments: int,
-        power: int,
-        **kwargs: dict[str, int],
-    ):
+    def _calc_curr_return(self):
         """
-        Calculate the return from game states.
+        Calculate the current return.
 
         The formula is designed to encourage grabbing life fragments, bomb
         fragments and power items, while penalizing life losses.
+
+        We also penalize for staying too long in the auto-item-collect zone
+        to prevent the agent "lazily" learn a policy to always stay in it.
 
         1 life = 3 life fragments
         1 bomb = 8 bomb fragments
         """
         return (
-            score
-            + (lives + life_fragments / 3) * 200000
-            + (bombs + bomb_fragments / 8) * 100000
-            + power * 1000
+            self.info["score"]
+            + (self.info["lives"] + self.info["life_fragments"] / 3) * 200000
+            + (self.info["bombs"] + self.info["bomb_fragments"] / 8) * 100000
+            + self.info["power"] * 1000
+            - self.in_auto_collect_zone_time * 10000
         )

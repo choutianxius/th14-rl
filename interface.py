@@ -1,3 +1,9 @@
+"""
+Game interface.
+
+TODO: Rewrite to use factory pattern
+"""
+
 import sys
 import ctypes
 import win32api
@@ -10,6 +16,7 @@ import pygetwindow as gw
 import keyboard
 import pyscreeze
 from collections import deque
+import struct
 
 
 logging.basicConfig(
@@ -34,6 +41,9 @@ _OFFSETS = dict(
     graze=0xF5840,
     game_state=0xF7AC8,  # 0 = pausing, 1 = end of run, 2 = playing
     in_dialog=0xF7BA8,  # -1 = in dialog, otherwise = not
+    global_timer=(0xDB520, 0x191E0),
+    f_player_pos_x=(0xDB67C, 0x5E0),
+    f_player_pos_y=(0xDB67C, 0x5E4),
 )
 
 # the Windows borders are included in _WINDOW_WIDTH and _WINDOW_HEIGHT
@@ -128,25 +138,39 @@ def _read_game_memory(offset, size, rel=True):
     return buffer.raw
 
 
-def read_game_int(key: str):
+def read_game_val(key: str):
     if key not in _OFFSETS:
         raise ValueError(f"Invalid offset key: {key}")
+
     offset = _OFFSETS[key]
+    if isinstance(offset, int):
+        data = _read_game_memory(offset, 4, rel=True)
+    elif isinstance(offset, tuple):
+        if len(offset) != 2:
+            raise ValueError(
+                "Pointer offsets must be given in the form of (base_addr, relative_offset)"
+            )
+        base_addr = int.from_bytes(
+            _read_game_memory(offset[0], 4, rel=True), byteorder="little", signed=False
+        )
+        addr = base_addr + offset[1]
+        data = _read_game_memory(addr, 4, rel=False)
+    else:
+        raise ValueError(
+            "Invalid offset received, should be an integer or a tuple of two integers"
+        )
+
+    if key.startswith("f_"):  # float
+        return struct.unpack("f", data)[0]
     return int.from_bytes(
-        _read_game_memory(offset, 4, not key.endswith("_abs")),
+        data,
         byteorder="little",
         signed=True,
     )
 
 
-_OFFSETS["global_timer_abs"] = 0x191E0 + int.from_bytes(
-    _read_game_memory(0xDB520, 4), byteorder="little", signed=False
-)
-
-
 def _time():
-    assert "global_timer_abs" in _OFFSETS
-    return read_game_int("global_timer_abs")
+    return read_game_val("global_timer")
 
 
 def _sleep(k: int = 0):
@@ -255,7 +279,7 @@ def skip_dialog():
         if dialog_end():
             break
         tries += 1
-        q.append(read_game_int("in_dialog"))
+        q.append(read_game_val("in_dialog"))
         _sleep(max(0, 5 - _time() + t0))
     else:
         raise Exception("Failed to skip dialog!")
@@ -355,7 +379,7 @@ def reset_from_end_of_run() -> None:
     max_retry = 60
     while count < max_retry:
         t0 = _time()
-        if read_game_int("game_state") == 2:
+        if read_game_val("game_state") == 2:
             break
         count += 1
         _sleep(max(0, 5 - _time() + t0))
@@ -375,7 +399,7 @@ def force_reset() -> None:
     max_retry = 60
     while count < max_retry:
         t0 = _time()
-        if read_game_int("game_state") == 2:
+        if read_game_val("game_state") == 2:
             break
         count += 1
         _sleep(max(0, 5 - _time() + t0))
@@ -386,7 +410,9 @@ def force_reset() -> None:
 def clean_up():
     resume_game_process()
     release_all_keys()
+    _sleep(5)
     _press_and_release("esc")
+    _sleep(5)
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 
@@ -398,7 +424,7 @@ if __name__ == "__main__":
             t0 = _time()
             info = {}
             for k in _OFFSETS:
-                info[k] = read_game_int(k)
+                info[k] = read_game_val(k)
             logger.info(info)
             _sleep(max(0, 30 - _time() + t0))
     except KeyboardInterrupt:
