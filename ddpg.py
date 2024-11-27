@@ -1,7 +1,5 @@
 from stable_baselines3 import DDPG
-from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.noise import NormalActionNoise
-from stable_baselines3.common.vec_env import SubprocVecEnv
 import numpy as np
 import torch
 from environment import Touhou14Env
@@ -11,9 +9,11 @@ try:
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
     print(f"CUDA version: {torch.version.cuda}")
-    print(f"Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU detected'}")
+    print(
+        f"Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU detected'}"
+    )
 
-    #torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    # torch.set_default_tensor_type('torch.cuda.FloatTensor')
     # Initialize the environment
     env = Touhou14Env()
 
@@ -22,7 +22,9 @@ try:
 
     # Define action noise for exploration
     action_dim = env.action_space.shape[0]
-    action_noise = NormalActionNoise(mean=np.zeros(action_dim), sigma=0.3 * np.ones(action_dim))  # Increase noise
+    action_noise = NormalActionNoise(
+        mean=np.zeros(action_dim), sigma=0.3 * np.ones(action_dim)
+    )  # Increase noise
 
     # Initialize the DDPG model
     model = DDPG(
