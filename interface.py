@@ -412,7 +412,12 @@ def clean_up():
     release_all_keys()
     _sleep(5)
     _press_and_release("esc")
-    _sleep(5)
+    _sleep(60)
+    _press_and_release("q")
+    _sleep(120)
+    for _ in range(4):
+        _press_and_release("esc")
+        _sleep(60)
     win32api.CloseHandle(_process_handle)
     logger.info("Interface successfully exited")
 
