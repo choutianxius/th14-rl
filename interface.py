@@ -227,15 +227,15 @@ def init():
     _press_and_release("z")
     _sleep(60)
 
-    # stage 1, spell card 3, reimu B
+    # stage 1, spell card 2, reimu A
     _press_and_release("z")
     _sleep(60)
     _press_and_release("down")
     _sleep(60)
-    _press_and_release("down")
-    _sleep(60)
-    _press_and_release("right")
-    _sleep(60)
+    # _press_and_release("down")
+    # _sleep(60)
+    # _press_and_release("right")
+    # _sleep(60)
     _press_and_release("z")
     _sleep(60)
     _press_and_release("z")
@@ -372,6 +372,11 @@ def reset_from_end_of_run() -> None:
     """
     Reset when the game is cleared or all lives are lost.
     """
+    release_all_keys()
+    _press_and_release("esc")
+    _sleep(30)
+    _press_and_release("up")
+    _sleep(30)
     _press_and_release("z")
     _sleep(30)
     count = 0
@@ -407,6 +412,7 @@ def force_reset() -> None:
 
 
 def clean_up():
+    _get_focus()
     resume_game_process()
     release_all_keys()
     _sleep(5)
@@ -414,6 +420,8 @@ def clean_up():
     if game_state == 0:  # pausing
         _press_and_release("q")
     elif game_state == 1:
+        _press_and_release("esc")
+        _sleep(30)
         _press_and_release("z")
     else:
         _press_and_release("esc")

@@ -20,6 +20,13 @@ parser.add_argument(
     "--steps", "-n", type=int, default=100000, help="Number of training steps"
 )
 parser.add_argument(
+    "--target_update_interval",
+    "-t",
+    type=int,
+    default=5000,
+    help="Number of steps before synchronizing target and online networks",
+)
+parser.add_argument(
     "--n_save_chkpts", "-N", type=int, default=10, help="Number of checkpoints to save"
 )
 args = parser.parse_args()
@@ -37,6 +44,7 @@ try:
     metadata = {
         "memory": args.memory,
         "steps": args.steps,
+        "target_update_interval": args.target_update_interval,
     }
     with open(os.path.join(save_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f)
@@ -53,7 +61,7 @@ try:
         "MultiInputPolicy",
         env,
         buffer_size=args.memory,
-        target_update_interval=args.memory // 100,
+        target_update_interval=args.target_update_interval,
         device="cuda",
     )
     model.set_logger(logger)

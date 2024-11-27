@@ -72,10 +72,7 @@ class Touhou14Env(gym.Env):
         self.in_auto_collect_zone_time = 0
 
     def step(self, action: int | np.integer[Any]):
-        prev_return = self._calc_curr_return()
-
         move, slow = int(action % 5), int(action // 5)
-
         for _ in range(self.n_frame_stack):
             I.resume_game_process()
             I.act(move, slow)
@@ -101,8 +98,20 @@ class Touhou14Env(gym.Env):
             self.in_auto_collect_zone_time += 1
         else:
             self.in_auto_collect_zone_time = 0
+        prev_info = self.info
         self.info = curr_info
-        reward = self._calc_curr_return() - prev_return
+
+        # penalize life loss
+        # use in-game score to encourage shooting enemies
+        # and reward for staying alive
+        reward = (
+            (curr_info["lives"] - prev_info["lives"]) * 150
+            + (curr_info["life_fragments"] - prev_info["life_fragments"]) * 50
+            + np.clip(
+                (curr_info["score"] - prev_info["score"]) / 5, a_min=0, a_max=1000
+            )
+            + 1
+        )
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
         return next_state, reward, terminated, truncated, curr_info
@@ -217,30 +226,3 @@ class Touhou14Env(gym.Env):
         ):
             info[k] = I.read_game_val(k)
         return info
-
-    def _calc_curr_return(self):
-        """
-        Calculate the current return.
-
-        The formula is designed to encourage grabbing life fragments, bomb
-        fragments and power items, while penalizing life losses.
-
-        We also penalize for staying too long in the auto-item-collect zone
-        to prevent the agent "lazily" learn a policy to always stay in it.
-
-        1 life = 3 life fragments
-
-        1 bomb = 8 bomb fragments
-
-        For reference, in-game clear-stage score bonus is 3 million.
-
-        The current setting is quite arbitrary, and we might experiment with
-        multiple settings to find one with high learning speed
-        """
-        return (
-            self.info["score"]
-            + (self.info["lives"] + self.info["life_fragments"] / 3) * 200000
-            + (self.info["bombs"] + self.info["bomb_fragments"] / 8) * 100000
-            + self.info["power"] * 1000
-            - self.in_auto_collect_zone_time * 10000
-        )
