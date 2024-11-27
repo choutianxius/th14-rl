@@ -68,7 +68,7 @@ We expect the game process is active and you are on the title screen when initia
 
 ### Observation Space
 
-We follow the approach used in the DQN work, and use the stacked game frames as the observations. Notice that the sidebar area is cropped out.
+We use a composite observation space containing both the stacked game frames (with sidebar areas cropped out) and extra in-game information (currently, the position of the character).
 
 ### Action Space
 
@@ -104,11 +104,13 @@ The actions are mapped to keyboard press/release status by the interface.
 
 The reward is calculated using a combination of in-game score and some custom logic. It's calculated using the following formula from in-game variables:
 
-$$ criterion = score + total \ lives \times 20000 + total \ bombs \times 10000 + power \times 1000 $$
+$$ \text{criterion} = \text{score} + \text{total lives} \times 20000 + \text{total bombs} \times 10000 + \text{power} \times 1000 - \text{time in auto-collect zone} \times 10000 $$
 
-$$ reward = \Delta \ criterion $$
+$$ \text{reward} = \Delta{\text{criterion}} $$
 
 The in-game score is increased by hitting enemies, collecting items, moving close to enemy bullets (so called "graze"s) and clearing stages. Beyond that, we want to explicitly encourage the agent to collect items and penalize life losses, so the extra items are added in the formula.
+
+We also penalize for staying in the auto-item-collect zone for too long. This term is introduced to prevent the agent from "lazily" learning a policy to always stay in that zone.
 
 The weights in the formula are to some extent arbitrary, and it's possible to experiment with various settings to find optimal ones for training agents.
 
