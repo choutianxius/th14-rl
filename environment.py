@@ -111,7 +111,7 @@ class Touhou14Env(gym.Env):
             reward += 1500 * max(0, 500 - self.episode_time) / 500
 
         # penalize useless movement
-        if next_state["player_position"] == self.prev_pos and move != 0:
+        if np.all(next_state["player_position"] == self.prev_pos) and move != 0:
             reward -= 10
         self.prev_pos = next_state["player_position"]
 
