@@ -63,8 +63,8 @@ try:
         buffer_size=args.memory,
         target_update_interval=args.target_update_interval,
         device="cuda",
-        exploration_fraction=0.25,
-        learning_starts=args.memory,  # start learning when memory is full
+        exploration_fraction=2,
+        learning_starts=args.memory // 2,
         exploration_final_eps=0.01,
     )
     model.set_logger(logger)

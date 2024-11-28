@@ -107,9 +107,9 @@ class Touhou14Env(gym.Env):
         diff_boss_hp = min(0, curr_info["boss_hp"] - prev_info["boss_hp"])
         if diff_boss_hp < -100:
             diff_boss_hp = 0
-        reward = diff_life * 500 - diff_boss_hp + 0.1
+        reward = diff_life * 500 - diff_boss_hp + 1
         if curr_info["boss_hp"] == 9999 and prev_info["boss_hp"] == 0:
-            reward += 1500 * max(0, 1000 - self.episode_time) / 1000
+            reward += 1500 * max(0, 500 - self.episode_time) / 500
 
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
