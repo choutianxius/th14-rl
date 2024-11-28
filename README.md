@@ -59,10 +59,11 @@ Utilities to suspend and resume the game process are also provided for the conve
 
 For simplicity, the RL problem is currently restricted to:
 
-- Character: Reimu B
-- Stage: 1
+- Character: Reimu A
+- Using the "Spell Practice" mode
+- Stage 1, spell card 2, No. 4
 - Difficulty: Normal
-- Using the "practice start" mode
+
 
 We expect the game process is active and you are on the title screen when initializing the environment by calling `Touhou14Env()`. The environment will be initialized to the start of the game run with the settings above. Also, the environment will keep the character always shooting, since there is no obvious advantage not doing so.
 
@@ -81,9 +82,9 @@ We use a discrete action space (`Discrete(10)`), which encodes two discrete dime
 
 Values of the two dimensions are calculated by:
 
-$$ dim1 = action \ \% \ 5$$
+$$ dim1 = action \, \% \, 5$$
 
-$$ dim2 = action \ // \ 5$$
+$$ dim2 = action \, // \, 5$$
 
 | Value of the First Dimension | Meaning     |
 | ---------------------------- | ----------- |

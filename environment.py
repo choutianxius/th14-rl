@@ -69,9 +69,13 @@ class Touhou14Env(gym.Env):
         self.initial_lives = self.info["lives"]
         # used to penalize staying in the auto-collect zone too long
         self.in_auto_collect_zone_time = 0
+        # used to penalize no movement
+        self.inactivity_threshold = 3
+        self.movement_queue = deque(maxlen=self.inactivity_threshold)
 
     def step(self, action: int | np.integer[Any]):
         move, slow = int(action % 5), int(action // 5)
+        self.movement_queue.append(move)
         for _ in range(self.n_frame_stack):
             I.resume_game_process()
             I.act(move, slow)
@@ -111,8 +115,16 @@ class Touhou14Env(gym.Env):
             )
             + 1
         )
+        # inactivity penalty
+        if (
+            len(self.movement_queue) == self.inactivity_threshold
+            and sum(self.movement_queue) == 0
+        ):
+            reward -= 10
+
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
+
         return next_state, reward, terminated, truncated, curr_info
 
     def reset(self, seed: int | None = None):
@@ -149,17 +161,22 @@ class Touhou14Env(gym.Env):
             0,
             255,
         ).astype(np.uint8)
-        # note the new size param passed to cv2 is (width, hight)
-        resized_frames = cv2.resize(
-            frames_gray_stacked,
-            (
-                int(I.FRAME_WIDTH * self.frame_downsize_ratio),
-                int(I.FRAME_HEIGHT * self.frame_downsize_ratio),
-            ),
-            interpolation=cv2.INTER_AREA,
-        )
+        if self.frame_downsize_ratio == 1.0:
+            resized_frames = frames_gray_stacked
+        else:
+            # note the new size param passed to cv2 is (width, hight)
+            resized_frames = cv2.resize(
+                frames_gray_stacked,
+                (
+                    int(I.FRAME_WIDTH * self.frame_downsize_ratio),
+                    int(I.FRAME_HEIGHT * self.frame_downsize_ratio),
+                ),
+                interpolation=cv2.INTER_AREA,
+            )
+
         pos_x = I.read_game_val("f_player_pos_x")
         pos_y = I.read_game_val("f_player_pos_y")
+
         return {
             "frames": resized_frames,
             "player_position": np.array((pos_x, pos_y), dtype=np.float32),

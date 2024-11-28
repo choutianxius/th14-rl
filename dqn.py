@@ -13,7 +13,7 @@ parser.add_argument(
     "--memory",
     "-m",
     type=int,
-    default=10000,
+    default=25000,
     help="Replay memory size. This should be limited to your available RAM",
 )
 parser.add_argument(
@@ -23,7 +23,7 @@ parser.add_argument(
     "--target_update_interval",
     "-t",
     type=int,
-    default=5000,
+    default=1000,
     help="Number of steps before synchronizing target and online networks",
 )
 parser.add_argument(
@@ -63,6 +63,9 @@ try:
         buffer_size=args.memory,
         target_update_interval=args.target_update_interval,
         device="cuda",
+        exploration_fraction=0.25,
+        learning_starts=args.memory,  # start learning when memory is full
+        exploration_final_eps=0.01,
     )
     model.set_logger(logger)
 

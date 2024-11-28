@@ -415,7 +415,7 @@ def clean_up():
     _get_focus()
     resume_game_process()
     release_all_keys()
-    _sleep(5)
+    _sleep(30)
     game_state = read_game_val("game_state")
     if game_state == 0:  # pausing
         _press_and_release("q")
