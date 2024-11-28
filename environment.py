@@ -69,6 +69,7 @@ class Touhou14Env(gym.Env):
         self.initial_lives = self.info["lives"]
         self.episode_time = 0
         self.finish_bonus_given = False
+        self.prev_pos = None
 
     def step(self, action: int | np.integer[Any]):
         self.episode_time += 1
@@ -98,9 +99,6 @@ class Touhou14Env(gym.Env):
         prev_info = self.info
         self.info = curr_info
 
-        # penalize life loss
-        # use in-game score to encourage shooting enemies
-        # and reward for staying alive
         diff_life = (curr_info["lives"] - prev_info["lives"]) * 3 + (
             curr_info["life_fragments"] - prev_info["life_fragments"]
         )
@@ -108,8 +106,14 @@ class Touhou14Env(gym.Env):
         if diff_boss_hp < -100:
             diff_boss_hp = 0
         reward = diff_life * 500 - diff_boss_hp + 1
+        # clear bonus
         if curr_info["boss_hp"] == 9999 and prev_info["boss_hp"] == 0:
             reward += 1500 * max(0, 500 - self.episode_time) / 500
+
+        # penalize useless movement
+        if next_state["player_position"] == self.prev_pos and move != 0:
+            reward -= 10
+        self.prev_pos = next_state["player_position"]
 
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
@@ -137,6 +141,7 @@ class Touhou14Env(gym.Env):
         self.initial_lives = info["lives"]
         self.episode_time = 0
         self.finish_bonus_given = False
+        self.prev_pos = None
         return state, info
 
     def close(self):
