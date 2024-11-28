@@ -73,7 +73,6 @@ class Touhou14Env(gym.Env):
         # used to truncate episode when losing too many lives
         self.initial_lives = self.info["lives"]
         self.episode_time = 0
-        self.finish_bonus_given = False
         self.prev_pos = None
         self.prev_boss_pos = []
 
@@ -147,7 +146,6 @@ class Touhou14Env(gym.Env):
         self.info = info
         self.initial_lives = info["lives"]
         self.episode_time = 0
-        self.finish_bonus_given = False
         self.prev_pos = None
         self.prev_boss_pos = None
         return state, info
