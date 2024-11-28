@@ -75,6 +75,7 @@ class Touhou14Env(gym.Env):
         self.episode_time = 0
         self.finish_bonus_given = False
         self.prev_pos = None
+        self.prev_boss_pos = []
 
     def step(self, action: int | np.integer[Any]):
         self.episode_time += 1
@@ -119,6 +120,7 @@ class Touhou14Env(gym.Env):
         if np.all(next_state["player_position"] == self.prev_pos) and move != 0:
             reward -= 10
         self.prev_pos = next_state["player_position"]
+        self.prev_boss_pos = next_state["boss_position"]
 
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
@@ -147,6 +149,7 @@ class Touhou14Env(gym.Env):
         self.episode_time = 0
         self.finish_bonus_given = False
         self.prev_pos = None
+        self.prev_boss_pos = None
         return state, info
 
     def close(self):
@@ -178,11 +181,15 @@ class Touhou14Env(gym.Env):
         pos_y = I.read_game_val("f_player_pos_y")
         boss_pos_x = I.read_game_val("f_boss_pos_x")
         boss_pos_y = I.read_game_val("f_boss_pos_y")
+        if boss_pos_x is not None and boss_pos_x is not None:
+            boss_position = np.array((boss_pos_x, boss_pos_y), dtype=np.float32)
+        else:
+            boss_position = self.prev_boss_pos
 
         return {
             "frames": resized_frames,
             "player_position": np.array((pos_x, pos_y), dtype=np.float32),
-            "boss_position": np.array((boss_pos_x, boss_pos_y), dtype=np.float32),
+            "boss_position": boss_position,
         }
 
     def _get_game_info(self) -> dict[str, int]:
