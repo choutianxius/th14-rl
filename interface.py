@@ -44,6 +44,7 @@ _OFFSETS = dict(
     global_timer=(0xDB520, 0x191E0),
     f_player_pos_x=(0xDB67C, 0x5E0),
     f_player_pos_y=(0xDB67C, 0x5E4),
+    boss_health=(((0xDB544, 0xD0), 0x0), 0x3F74)
 )
 
 # the Windows borders are included in _WINDOW_WIDTH and _WINDOW_HEIGHT
@@ -138,6 +139,43 @@ def _read_game_memory(offset, size, rel=True):
     return buffer.raw
 
 
+def _parse_ptr_addr(ptr: tuple):
+    """
+    Parse a pointer (with an attribute) to get its absolute address.
+
+    The pointer is assumed to be in the form of (base_addr, relative_offset),
+    where base_addr should be an integer or a tuple (nested).
+
+    When base_addr is an integer, it's treated as the relative base address.
+
+    When base_addr is a tuple, it will be recursively parsed.
+
+    Example
+    -------
+    foo.bar: (rel_base_addr_foo, rel_offset_bar)
+    foo.bar.bar1: ((rel_base_addr_foo, rel_offset_bar), rel_offset_bar1)
+    """
+    if len(ptr) != 2:
+        raise ValueError(
+            "Pointer must be given in the form of (base_addr, relative_offset)"
+        )
+    if isinstance(ptr[0], tuple):
+        base_addr = int.from_bytes(
+            _read_game_memory(_parse_ptr_addr(ptr[0]), 4, rel=False),
+            byteorder="little",
+            signed=False
+        )
+    else:
+        if not isinstance(ptr[0], int):
+            raise ValueError("Base relative addr must be an integer")
+        base_addr = int.from_bytes(
+            _read_game_memory(ptr[0], 4, rel=True), byteorder="little", signed=False
+        )
+    if not isinstance(ptr[1], int):
+        raise ValueError("Offset must be an integer")
+    return base_addr + ptr[1]
+
+
 def read_game_val(key: str):
     if key not in _OFFSETS:
         raise ValueError(f"Invalid offset key: {key}")
@@ -146,18 +184,11 @@ def read_game_val(key: str):
     if isinstance(offset, int):
         data = _read_game_memory(offset, 4, rel=True)
     elif isinstance(offset, tuple):
-        if len(offset) != 2:
-            raise ValueError(
-                "Pointer offsets must be given in the form of (base_addr, relative_offset)"
-            )
-        base_addr = int.from_bytes(
-            _read_game_memory(offset[0], 4, rel=True), byteorder="little", signed=False
-        )
-        addr = base_addr + offset[1]
+        addr = _parse_ptr_addr(offset)
         data = _read_game_memory(addr, 4, rel=False)
     else:
         raise ValueError(
-            "Invalid offset received, should be an integer or a tuple of two integers"
+            "Invalid offset received, should be an integer or a tuple"
         )
 
     if key.startswith("f_"):  # float
