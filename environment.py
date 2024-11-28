@@ -74,7 +74,7 @@ class Touhou14Env(gym.Env):
         self.initial_lives = self.info["lives"]
         self.episode_time = 0
         self.prev_pos = None
-        self.prev_boss_pos = []
+        self.prev_boss_pos = None
 
     def step(self, action: int | np.integer[Any]):
         self.episode_time += 1
