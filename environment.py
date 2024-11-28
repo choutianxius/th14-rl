@@ -67,15 +67,13 @@ class Touhou14Env(gym.Env):
         self.info = self._get_game_info()
         # used to truncate episode when losing too many lives
         self.initial_lives = self.info["lives"]
-        # used to penalize staying in the auto-collect zone too long
-        self.in_auto_collect_zone_time = 0
-        # used to penalize no movement
-        self.inactivity_threshold = 3
-        self.movement_queue = deque(maxlen=self.inactivity_threshold)
+        self.episode_time = 0
+        self.finish_bonus_given = False
 
     def step(self, action: int | np.integer[Any]):
+        self.episode_time += 1
         move, slow = int(action % 5), int(action // 5)
-        self.movement_queue.append(move)
+
         for _ in range(self.n_frame_stack):
             I.resume_game_process()
             I.act(move, slow)
@@ -97,30 +95,21 @@ class Touhou14Env(gym.Env):
 
         terminated = curr_info["game_state"] != 2
         truncated = curr_info["lives"] < self.initial_lives - self.max_lost_lives
-        if next_state["player_position"][1] <= 100.0:
-            self.in_auto_collect_zone_time += 1
-        else:
-            self.in_auto_collect_zone_time = 0
         prev_info = self.info
         self.info = curr_info
 
         # penalize life loss
         # use in-game score to encourage shooting enemies
         # and reward for staying alive
-        reward = (
-            (curr_info["lives"] - prev_info["lives"]) * 150
-            + (curr_info["life_fragments"] - prev_info["life_fragments"]) * 50
-            + np.clip(
-                (curr_info["score"] - prev_info["score"]) / 5, a_min=0, a_max=1000
-            )
-            + 1
+        diff_life = (curr_info["lives"] - prev_info["lives"]) * 3 + (
+            curr_info["life_fragments"] - prev_info["life_fragments"]
         )
-        # inactivity penalty
-        if (
-            len(self.movement_queue) == self.inactivity_threshold
-            and sum(self.movement_queue) == 0
-        ):
-            reward -= 10
+        diff_boss_hp = min(0, curr_info["boss_hp"] - prev_info["boss_hp"])
+        if diff_boss_hp < -100:
+            diff_boss_hp = 0
+        reward = diff_life * 500 - diff_boss_hp + 0.1
+        if curr_info["boss_hp"] == 9999 and prev_info["boss_hp"] == 0:
+            reward += 1500 * max(0, 1000 - self.episode_time) / 1000
 
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
@@ -146,7 +135,8 @@ class Touhou14Env(gym.Env):
         info = self._get_game_info()
         self.info = info
         self.initial_lives = info["lives"]
-        self.in_auto_collect_zone_time = 0
+        self.episode_time = 0
+        self.finish_bonus_given = False
         return state, info
 
     def close(self):
@@ -193,6 +183,7 @@ class Touhou14Env(gym.Env):
             "power",
             "game_state",
             "in_dialog",
+            "boss_hp",
         ):
-            info[k] = I.read_game_val(k)
+            info[k] = I.read_game_val(k) or 0
         return info

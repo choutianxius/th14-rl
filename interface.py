@@ -44,7 +44,11 @@ _OFFSETS = dict(
     global_timer=(0xDB520, 0x191E0),
     f_player_pos_x=(0xDB67C, 0x5E0),
     f_player_pos_y=(0xDB67C, 0x5E4),
-    boss_health=(((0xDB544, 0xD0), 0x0), 0x3F74)
+    # enemies seems to be stored in a linked list
+    # .next = 0x4
+    # .val = 0x0
+    # should set this based on specific game level
+    boss_hp=(((((0xDB544, 0xD0), 0x4), 0x4), 0x0), 0x11F0 + 0x3F74),
 )
 
 # the Windows borders are included in _WINDOW_WIDTH and _WINDOW_HEIGHT
@@ -132,10 +136,9 @@ def _read_game_memory(offset, size, rel=True):
         ctypes.byref(bytesRead),
     )
     if not ok:
-        logger.error(
+        raise RuntimeError(
             f"Failed to read memory at offset {hex(offset)}. Process may have exitted."
         )
-        return None
     return buffer.raw
 
 
@@ -163,7 +166,7 @@ def _parse_ptr_addr(ptr: tuple):
         base_addr = int.from_bytes(
             _read_game_memory(_parse_ptr_addr(ptr[0]), 4, rel=False),
             byteorder="little",
-            signed=False
+            signed=False,
         )
     else:
         if not isinstance(ptr[0], int):
@@ -177,27 +180,28 @@ def _parse_ptr_addr(ptr: tuple):
 
 
 def read_game_val(key: str):
-    if key not in _OFFSETS:
-        raise ValueError(f"Invalid offset key: {key}")
+    try:
+        if key not in _OFFSETS:
+            raise ValueError(f"Invalid offset key: {key}")
 
-    offset = _OFFSETS[key]
-    if isinstance(offset, int):
-        data = _read_game_memory(offset, 4, rel=True)
-    elif isinstance(offset, tuple):
-        addr = _parse_ptr_addr(offset)
-        data = _read_game_memory(addr, 4, rel=False)
-    else:
-        raise ValueError(
-            "Invalid offset received, should be an integer or a tuple"
+        offset = _OFFSETS[key]
+        if isinstance(offset, int):
+            data = _read_game_memory(offset, 4, rel=True)
+        elif isinstance(offset, tuple):
+            addr = _parse_ptr_addr(offset)
+            data = _read_game_memory(addr, 4, rel=False)
+        else:
+            raise ValueError("Invalid offset received, should be an integer or a tuple")
+
+        if key.startswith("f_"):  # float
+            return struct.unpack("f", data)[0]
+        return int.from_bytes(
+            data,
+            byteorder="little",
+            signed=True,
         )
-
-    if key.startswith("f_"):  # float
-        return struct.unpack("f", data)[0]
-    return int.from_bytes(
-        data,
-        byteorder="little",
-        signed=True,
-    )
+    except RuntimeError:
+        return None
 
 
 def _time():
@@ -446,7 +450,7 @@ def clean_up():
     _get_focus()
     resume_game_process()
     release_all_keys()
-    _sleep(30)
+    _sleep(60)
     game_state = read_game_val("game_state")
     if game_state == 0:  # pausing
         _press_and_release("q")
