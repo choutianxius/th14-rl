@@ -45,10 +45,13 @@ _OFFSETS = dict(
     f_player_pos_x=(0xDB67C, 0x5E0),
     f_player_pos_y=(0xDB67C, 0x5E4),
     # enemies seems to be stored in a linked list
-    # .next = 0x4
-    # .val = 0x0
+    # .next = 0x4, .val = 0x0
     # should set this based on specific game level
+    # only applicable for Spell Card mode (boss fight only)
+    # below is for stage 1, spell card 2, No. 4
     boss_hp=(((((0xDB544, 0xD0), 0x4), 0x4), 0x0), 0x11F0 + 0x3F74),
+    f_boss_pos_x=(((((0xDB544, 0xD0), 0x4), 0x4), 0x0), 0x11F0 + 0x44),
+    f_boss_pos_y=(((((0xDB544, 0xD0), 0x4), 0x4), 0x0), 0x11F0 + 0x48),
 )
 
 # the Windows borders are included in _WINDOW_WIDTH and _WINDOW_HEIGHT

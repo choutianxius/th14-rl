@@ -57,6 +57,11 @@ class Touhou14Env(gym.Env):
                     high=np.array((184.0, 432.0), dtype=np.float32),
                     shape=(2,),
                 ),
+                "boss_position": gym.spaces.Box(
+                    low=np.array((-184.0, 32.0), dtype=np.float32),
+                    high=np.array((184.0, 432.0), dtype=np.float32),
+                    shape=(2,),
+                ),
             }
         )
         self.action_space = gym.spaces.Discrete(10)
@@ -171,10 +176,13 @@ class Touhou14Env(gym.Env):
 
         pos_x = I.read_game_val("f_player_pos_x")
         pos_y = I.read_game_val("f_player_pos_y")
+        boss_pos_x = I.read_game_val("f_boss_pos_x")
+        boss_pos_y = I.read_game_val("f_boss_pos_y")
 
         return {
             "frames": resized_frames,
             "player_position": np.array((pos_x, pos_y), dtype=np.float32),
+            "boss_position": np.array((boss_pos_x, boss_pos_y), dtype=np.float32),
         }
 
     def _get_game_info(self) -> dict[str, int]:
