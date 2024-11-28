@@ -23,7 +23,7 @@ parser.add_argument(
     "--target_update_interval",
     "-t",
     type=int,
-    default=1000,
+    default=2500,
     help="Number of steps before synchronizing target and online networks",
 )
 parser.add_argument(
