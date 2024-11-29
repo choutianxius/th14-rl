@@ -64,7 +64,6 @@ try:
         target_update_interval=args.target_update_interval,
         device="cuda",
         exploration_fraction=0.2,
-        exploration_final_eps=0.01,
         policy_kwargs=dict(
             net_arch=(256, 256), features_extractor_class=CombinedExtractor
         ),
