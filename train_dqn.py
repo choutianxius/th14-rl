@@ -1,6 +1,8 @@
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.torch_layers import CombinedExtractor
 from stable_baselines3 import DQN
+from dueling_dqn import DuelingDQNPolicy
 from environment import Touhou14Env
 from datetime import datetime
 import os
@@ -29,6 +31,9 @@ parser.add_argument(
 parser.add_argument(
     "--n_save_chkpts", "-N", type=int, default=10, help="Number of checkpoints to save"
 )
+parser.add_argument(
+    "--dueling", action="store_true", help="Use dueling architecture or not"
+)
 args = parser.parse_args()
 
 
@@ -41,13 +46,8 @@ try:
         os.makedirs(save_dir)
 
     # record training config
-    metadata = {
-        "memory": args.memory,
-        "steps": args.steps,
-        "target_update_interval": args.target_update_interval,
-    }
     with open(os.path.join(save_dir, "metadata.json"), "w") as f:
-        json.dump(metadata, f)
+        json.dump(vars(args), f)
 
     # setup model
     logger = configure(save_dir, ["csv", "stdout"])
@@ -58,13 +58,16 @@ try:
         verbose=2,
     )
     model = DQN(
-        "MultiInputPolicy",
+        DuelingDQNPolicy if args.dueling else "MultiInputPolicy",
         env,
         buffer_size=args.memory,
         target_update_interval=args.target_update_interval,
         device="cuda",
         exploration_fraction=0.2,
         exploration_final_eps=0.01,
+        policy_kwargs=dict(
+            net_arch=(256, 256), features_extractor_class=CombinedExtractor
+        ),
     )
     model.set_logger(logger)
 
