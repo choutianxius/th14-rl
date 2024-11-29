@@ -15,11 +15,11 @@ parser.add_argument(
     "--memory",
     "-m",
     type=int,
-    default=25000,
+    default=10000,
     help="Replay memory size. This should be limited to your available RAM",
 )
 parser.add_argument(
-    "--steps", "-n", type=int, default=100000, help="Number of training steps"
+    "--steps", "-n", type=int, default=50000, help="Number of training steps"
 )
 parser.add_argument(
     "--target_update_interval",
@@ -63,7 +63,8 @@ try:
         buffer_size=args.memory,
         target_update_interval=args.target_update_interval,
         device="cuda",
-        exploration_fraction=0.2,
+        exploration_fraction=0.4,
+        exploration_final_eps=0.01,
         policy_kwargs=dict(
             net_arch=(256, 256), features_extractor_class=CombinedExtractor
         ),
