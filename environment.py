@@ -122,6 +122,9 @@ class Touhou14Env(gym.Env):
         self.prev_pos = next_state["player_position"]
         self.prev_boss_pos = next_state["boss_position"]
 
+        # penalize risky y positions
+        reward -= (432.0 - next_state["player_position"][1]) / 10
+
         if self.logger:
             self.logger.debug({"action": action.tolist(), "reward": reward})
 
