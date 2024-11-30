@@ -1,6 +1,6 @@
 from stable_baselines3 import DDPG
 from environment import Touhou14Env
-from wrapper import DiscretizeActionWrapper
+from ddpg_action_wrapper import DiscretizeActionWrapper
 import numpy as np
 
 # Number of episodes to simulate
@@ -14,7 +14,9 @@ wrapped_env = DiscretizeActionWrapper(env)
 
 # Load the trained model
 try:
-    model = DDPG.load("save\ddpg", env=wrapped_env)  # Ensure the wrapped environment is passed
+    model = DDPG.load(
+        "save\ddpg", env=wrapped_env
+    )  # Ensure the wrapped environment is passed
     print("Model loaded successfully!")
 
     # Adding exploration noise during inference
@@ -40,7 +42,9 @@ try:
             # Clip action to remain within valid action bounds
             action = np.clip(action, -1, 1)
 
-            print(f"Episode {episode + 1}, Step {step}, Action: {action}")  # Debugging action
+            print(
+                f"Episode {episode + 1}, Step {step}, Action: {action}"
+            )  # Debugging action
 
             # Take the action in the environment
             obs, reward, done, truncated, info = wrapped_env.step(action)
@@ -58,6 +62,6 @@ except Exception as e:
 
 finally:
     # Ensure the environment is properly closed
-    if 'wrapped_env' in locals() and wrapped_env is not None:
+    if "wrapped_env" in locals() and wrapped_env is not None:
         wrapped_env.close()
     print("Environment closed.")
