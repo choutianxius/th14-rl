@@ -56,7 +56,7 @@ model.set_logger(logger)
 # Train the model
 try:
     model.learn(
-        total_timesteps=total_timesteps, log_interval=4, callback=chkpt_callback
+        total_timesteps=total_timesteps, log_interval=1, callback=chkpt_callback
     )
 
     # Save the final trained model
