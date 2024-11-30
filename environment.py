@@ -174,7 +174,7 @@ class Touhou14Env(gym.Env):
         inactivity_threshold = 1e-3  # Adjust as needed
         return all(diff < inactivity_threshold for diff in frame_differences)
 
-    def reset(self, seed: int | None = None):
+    def reset(self, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
 
         # Reset the game state
