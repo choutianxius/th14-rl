@@ -34,7 +34,8 @@ chkpt_callback = CheckpointCallback(
 # Set up action noise for exploration
 action_dim = wrapped_env.action_space.shape[0]
 action_noise = NormalActionNoise(
-    mean=np.zeros(action_dim), sigma=exploration_noise * np.ones(action_dim)
+    mean=np.zeros(action_dim),
+    sigma=exploration_noise * np.ones(action_dim) * wrapped_env.action_space.high[0],
 )
 
 # Initialize the DDPG model with hyperparameters similar to the DQN
