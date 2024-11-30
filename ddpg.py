@@ -1,58 +1,67 @@
 from stable_baselines3 import DDPG
 from stable_baselines3.common.noise import NormalActionNoise
-import numpy as np
-import torch
+from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.logger import configure
 from environment import Touhou14Env
+from wrapper import DiscretizeActionWrapper
+from datetime import datetime
+import os
+import numpy as np
 
-# Set up the environment
+# Set up hyperparameters similar to DQN
+buffer_size = 25000  # Replay memory size similar to DQN
+batch_size = 64  # Mini-batch size
+learning_rate = 0.005  # Learning rate similar to DQN
+train_freq = (10, "step")  # Training frequency
+total_timesteps = 100000  # Number of training steps
+exploration_noise = 0.1  # Action noise to promote exploration
+
+# Set up save directory
+save_dir = f"./save/ddpg_{datetime.strftime(datetime.now(), '%Y-%m-%d_%H-%M-%S')}"
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+
+# Set up environment and wrapper
+env = Touhou14Env()
+wrapped_env = DiscretizeActionWrapper(env)
+
+# Configure logger and checkpoint callback
+logger = configure(save_dir, ["csv", "stdout"])
+chkpt_callback = CheckpointCallback(save_freq=total_timesteps // 10, save_path=save_dir, name_prefix="model", verbose=2)
+
+# Set up action noise for exploration
+action_dim = wrapped_env.action_space.shape[0]
+action_noise = NormalActionNoise(mean=np.zeros(action_dim), sigma=exploration_noise * np.ones(action_dim))
+
+# Initialize the DDPG model with hyperparameters similar to the DQN
+model = DDPG(
+    "MultiInputPolicy",
+    wrapped_env,
+    buffer_size=buffer_size,
+    batch_size=batch_size,
+    train_freq=train_freq,
+    learning_rate=learning_rate,
+    action_noise=action_noise,
+    verbose=1,
+    device="cuda",
+)
+
+# Set logger
+model.set_logger(logger)
+
+# Train the model
 try:
-    print(f"PyTorch version: {torch.__version__}")
-    print(f"CUDA available: {torch.cuda.is_available()}")
-    print(f"CUDA version: {torch.version.cuda}")
-    print(
-        f"Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU detected'}"
-    )
+    model.learn(total_timesteps=total_timesteps, log_interval=4, callback=chkpt_callback)
 
-    # torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    # Initialize the environment
-    env = Touhou14Env()
-
-    print(f"Using device: {'cuda' if torch.cuda.is_available() else 'cpu'}")
-    print(f"PyTorch version: {torch.__version__}")
-
-    # Define action noise for exploration
-    action_dim = env.action_space.shape[0]
-    action_noise = NormalActionNoise(
-        mean=np.zeros(action_dim), sigma=0.3 * np.ones(action_dim)
-    )  # Increase noise
-
-    # Initialize the DDPG model
-    model = DDPG(
-        "CnnPolicy",
-        env,
-        action_noise=action_noise,
-        buffer_size=50000,
-        batch_size=64,
-        train_freq=(10, "step"),
-        learning_rate=0.0005,
-        device="cuda",
-        verbose=1,
-    )
-
-    print(f"Stable-Baselines3 is using device: {model.device}")
-
-    # Train the model
-    model.learn(total_timesteps=1000, log_interval=4)
-
-    # Save the model
-    model.save("./save/ddpg")
-
-    print("model saved")
-
+    # Save the final trained model
+    model.save(os.path.join(save_dir, "model_final"))
+    print("Model training completed and saved successfully!")
 
 except Exception as e:
-    print(f"An error occurred: {e}")
+    print(f"An error occurred during training: {e}")
 
 finally:
-    env.close()
+    # Ensure the environment is properly closed
+    if 'wrapped_env' in locals() and wrapped_env is not None:
+        wrapped_env.close()
     print("Environment closed.")
