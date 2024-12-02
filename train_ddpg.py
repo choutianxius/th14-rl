@@ -1,8 +1,8 @@
-from stable_baselines3 import DDPG
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 from environment import Touhou14Env
+from ddpg import DDPG
 from ddpg_action_wrapper import DiscretizeActionWrapper
 from datetime import datetime
 import os
@@ -49,6 +49,7 @@ model = DDPG(
     action_noise=action_noise,
     verbose=1,
     device="cuda",
+    stats_window_size=5,
 )
 
 # Set logger

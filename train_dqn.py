@@ -68,6 +68,7 @@ try:
         policy_kwargs=dict(
             net_arch=(256, 256), features_extractor_class=CombinedExtractor
         ),
+        stats_window_size=5,
     )
     model.set_logger(logger)
 
