@@ -2,6 +2,8 @@
 
 ![Formatting Check](https://github.com/choutianxius/th14-rl/actions/workflows/check-formatting.yaml/badge.svg)
 
+<video width="384" height="448" src="https://github.com/user-attachments/assets/1567d045-3942-45bf-986f-c1e9bc32bfc0" type="video/mp4"></video>
+
 Provides a reinforcement learning environment and agent for [Touhou 14](https://en.touhouwiki.net/wiki/Double_Dealing_Character).
 
 ## Quick Start
