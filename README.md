@@ -36,6 +36,18 @@ pip install -r requirements.txt
 
 Notice that we are using PyTorch v2.5.1 which depends on [CUDA v12.4](https://developer.nvidia.com/cuda-12-4-0-download-archive). You should install the exact CUDA version.
 
+### Training
+
+We use the [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3) library for implementations of our RL agents (DQN, dueling DQN and DDPG). Please check the [`train_dqn.py`](train_dqn.py) and [`train_ddpg.py`](train_ddpg.py) scripts for details, which should be self-explanatory.
+
+### Evaluation
+
+Please check the [`eval.py`](eval.py) script.
+
+### Misc
+
+We also provide a script for recording videos for the environment, which is based on [`moviepy`](https://zulko.github.io/moviepy/). Check [`make_movie.py`](make_movie.py).
+
 ## Interface
 
 The [game interface](./interface.py) wraps around the game binary and is responsible for:
@@ -64,12 +76,13 @@ For simplicity, the RL problem is currently restricted to:
 - Stage 1, spell card 2, No. 4
 - Difficulty: Normal
 
+Note that the interface can only load the desired game level if your save file has certain progress (namely, you should have finished this spell card but not the less challenging ones). We will fix this constraint in the future.
 
 We expect the game process is active and you are on the title screen when initializing the environment by calling `Touhou14Env()`. The environment will be initialized to the start of the game run with the settings above. Also, the environment will keep the character always shooting, since there is no obvious advantage not doing so.
 
 ### Observation Space
 
-We use a composite observation space containing both the stacked game frames (with sidebar areas cropped out) and extra in-game information (currently, the position of the character).
+We use a composite observation space containing both the stacked game frames (with sidebar areas cropped out) and extra in-game information (the positions of the character and the boss).
 
 ### Action Space
 
@@ -80,11 +93,17 @@ We use a discrete action space (`Discrete(10)`), which encodes two discrete dime
 - The first dimension represents the movement of the character;
 - The second dimension represents whether the character is in "slow" mode.
 
+For RL algorithms that expect continuous action spaces, we also provide an action wrapper class for our environment (see [`ddpg_action_wrapper.py`](ddpg_action_wrapper.py))
+
 Values of the two dimensions are calculated by:
 
-$$ dim1 = action \, \% \, 5$$
+```math
+\text{dim1} = \text{action} \% 5
+```
 
-$$ dim2 = action \, // \, 5$$
+```math
+\text{dim1} = \left\lfloor \text{action} / 5 \right\rfloor
+```
 
 | Value of the First Dimension | Meaning     |
 | ---------------------------- | ----------- |
@@ -94,27 +113,39 @@ $$ dim2 = action \, // \, 5$$
 | 3                            | Move up     |
 | 4                            | Move down   |
 
-| Value of the Second Dimension | Meaning |
-| ----------------------------- | ------- |
-| 0                             | Normal  |
-| 1                             | Slow    |
+| Value of the Second Dimension | Meaning        |
+| ----------------------------- | -------------- |
+| 0                             | Normal         |
+| 1                             | Slow (focused) |
 
 The actions are mapped to keyboard press/release status by the interface.
 
 ### Reward
 
-The reward is calculated using a combination of in-game score and some custom logic. It's calculated using the following formula from in-game variables:
+The reward is calculated using the following formula from in-game variables:
 
-$$ \text{criterion} = \text{score} + \text{total lives} \times 20000 + \text{total bombs} \times 10000 + \text{power} \times 1000 - \text{time in auto-collect zone} \times 10000 $$
+```math
+\text{criterion} = \text{total lives} \times 1500 - \text{boss HP}
+```
 
-$$ \text{reward} = \Delta{\text{criterion}} $$
+```math
+\text{reward} = \Delta{\text{criterion}} + 1 + \text{clear bonus} - \text{risky y-pos penalty} - \text{useless action penalty}
+```
 
-The in-game score is increased by hitting enemies, collecting items, moving close to enemy bullets (so called "graze"s) and clearing stages. Beyond that, we want to explicitly encourage the agent to collect items and penalize life losses, so the extra items are added in the formula.
-
-We also penalize for staying in the auto-item-collect zone for too long. This term is introduced to prevent the agent from "lazily" learning a policy to always stay in that zone.
+The reward formula is designed so that the agent can focus on the goal of clearing the boss without dying. To encourage "cleaner" play styles, the clear bonus will be decreased based on the length to clear the boss. The two penalty items have been added to explicitly aid the agents to avoid suboptimal greedy policies. Finally, the positive 1 in the formula encourages the agent to stay alive longer if not completing the boss. 
 
 The weights in the formula are to some extent arbitrary, and it's possible to experiment with various settings to find optimal ones for training agents.
 
+Initially, we used the in-game score as the major component for calculating the criterion, and it turned out that the score is overly affected by collecting items, and it also has too significant absolute values, which hampers the formation of effective policies. This is a valuable lesson about the importance of a well-designed reward function when making RL agents to solve real problems. 
+
+## Possible Enhancements
+
+- [ ] Improve the game interface as a class.
+- [ ] Dynamically get the "inner" game screenshot, instead of using fixed window offsets.
+- [ ] Dynamically go to the desired game level by checking the game progress.
+- [ ] Support multiple modes and levels.
+
 ## Acknowledgement
 
-Much of the game interface is adapted from Guy-L's great work (see the [thgym](https://github.com/Guy-L/thgym/tree/master) repository).
+Much of the game interface is adapted from Guy-L's great work (see the [thgym](https://github.com/Guy-L/thgym/tree/master) repository and the [parakit](https://github.com/Guy-L/parakit) repository).
+
