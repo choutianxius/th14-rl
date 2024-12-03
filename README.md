@@ -1,4 +1,4 @@
-# Reinforcement Learning Agent for Touhou 14
+# Reinforcement Learning for Touhou 14
 
 ![Formatting Check](https://github.com/choutianxius/th14-rl/actions/workflows/check-formatting.yaml/badge.svg)
 
