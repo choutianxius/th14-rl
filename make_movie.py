@@ -13,7 +13,7 @@ parser.add_argument(
     help="Agent class to use for recording, should be dqn|duel|ddpg",
 )
 parser.add_argument(
-    "--model_path", type=str, required=True, help="Path to the model save file"
+    "--model_path", type=str, default="", help="Path to the model save file"
 )
 parser.add_argument(
     "--save_dir", type=str, required=True, help="Folder to put the video in"
@@ -30,7 +30,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 try:
-    if not os.path.exists(args.model_path):
+    if (args.agent != "random") and (not os.path.exists(args.model_path)):
         raise ValueError("Save path doesn't exist")
 
     if not os.path.exists(args.save_dir):
@@ -44,6 +44,12 @@ try:
         from ddpg import DDPG
 
         model = DDPG.load(args.model_path)
+    elif args.agent == "random":
+        from random_walk import RandomWalk
+
+        model = RandomWalk()
+    else:
+        raise ValueError("Invalid agent type, should be dqn or ddpg or random")
 
     env = Touhou14Env()
     frames = []
@@ -62,7 +68,7 @@ try:
 
     filename = os.path.join(
         args.save_dir,
-        datetime.strftime(datetime.now(), "%Y-%m-%d_%H-%M-%S") + ".mp4",
+        args.save_name,
     )
     clip.write_videofile(filename=filename)
     print(f"\033[92mSaved video to {filename}\033[0m")
