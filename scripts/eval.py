@@ -1,7 +1,7 @@
 from stable_baselines3 import DQN
-from ddpg import DDPG
-from environment import Touhou14Env
-from ddpg_action_wrapper import DiscretizeActionWrapper
+from models.ddpg import DDPG
+from environment.environment import Touhou14Env
+from environment.ddpg_action_wrapper import DiscretizeActionWrapper
 import argparse
 import json
 
