@@ -1,9 +1,9 @@
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
-from environment import Touhou14Env
-from ddpg import DDPG
-from ddpg_action_wrapper import DiscretizeActionWrapper
+from environment.environment import Touhou14Env
+from models.ddpg import DDPG
+from environment.ddpg_action_wrapper import DiscretizeActionWrapper
 from datetime import datetime
 import os
 import numpy as np

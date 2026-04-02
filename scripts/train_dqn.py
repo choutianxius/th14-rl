@@ -2,8 +2,8 @@ from stable_baselines3.common.logger import configure
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.torch_layers import CombinedExtractor
 from stable_baselines3 import DQN
-from dueling_dqn import DuelingDQNPolicy
-from environment import Touhou14Env
+from models.dueling_dqn import DuelingDQNPolicy
+from environment.environment import Touhou14Env
 from datetime import datetime
 import os
 import argparse
@@ -41,7 +41,7 @@ try:
     env = Touhou14Env()
 
     # save dir
-    save_dir = f"./save/dqn_{datetime.strftime(datetime.now(), "%Y-%m-%d_%H-%M-%S")}"
+    save_dir = f"./save/dqn_{datetime.strftime(datetime.now(), '%Y-%m-%d_%H-%M-%S')}"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 

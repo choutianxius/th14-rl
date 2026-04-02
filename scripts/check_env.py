@@ -3,7 +3,7 @@ Checks the env for compatibility with SB3
 """
 
 from stable_baselines3.common.env_checker import check_env
-from environment import Touhou14Env
+from environment.environment import Touhou14Env
 
 try:
     env = Touhou14Env()

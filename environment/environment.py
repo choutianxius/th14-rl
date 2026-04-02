@@ -1,6 +1,6 @@
 import gymnasium as gym
 import numpy as np
-import interface as I
+import environment.interface as I
 from collections import deque
 from typing import Any
 import cv2
